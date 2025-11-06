@@ -1,0 +1,7 @@
+{
+  "name": "Gestor de Préstamos de Equipos MediaLab",
+  "description": "Una aplicación web para que los instructores del MediaLab SENA gestionen los préstamos de equipos a los aprendices. La aplicación permite hacer seguimiento del inventario, registrar préstamos con evidencia fotográfica y generar informes. También se integra con la IA de Gemini para el análisis del estado de los equipos, resúmenes de informes e ideación creativa.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
