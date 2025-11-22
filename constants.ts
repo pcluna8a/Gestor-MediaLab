@@ -1,6 +1,8 @@
+
 import { User, Role, UserCategory } from './types';
 
 export const INITIAL_USERS: User[] = [
+  { id: '999999999', name: 'SUPER ADMINISTRADOR', role: Role.INSTRUCTOR_MEDIALAB }, // Acceso de respaldo
   { id: '1076906283', name: 'RUBER ARIEL MONTEALEGRE PAREDES', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },
   { id: '1010150164', name: 'KENNETH FERNANDO RESTREPO HERNANDEZ', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },
   { id: '1048994103', name: 'ESTHEFANY ESTRADA RIZO', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },

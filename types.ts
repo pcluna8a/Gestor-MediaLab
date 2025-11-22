@@ -1,3 +1,4 @@
+
 export enum Role {
   USUARIO_MEDIALAB = 'USUARIO-MEDIALAB',
   INSTRUCTOR_MEDIALAB = 'INSTRUCTOR-MEDIALAB',
@@ -6,7 +7,7 @@ export enum Role {
 export enum UserCategory {
   APRENDIZ = 'APRENDIZ',
   ADMINISTRATIVO = 'ADMINISTRATIVO',
-  INSTRUCTOR = 'INSTRUCTOR',
+  INSTRUCTOR_SENA = 'INSTRUCTOR_SENA', // Compañeros SENA de otras áreas
 }
 
 export interface User {
@@ -14,6 +15,11 @@ export interface User {
   name: string;
   role: Role;
   category?: UserCategory;
+  // Security Fields
+  email?: string;
+  passwordHash?: string; // Stored as SHA-256 hash
+  forcePasswordChange?: boolean; // True if user must change password on next login
+  photoURL?: string; // Base64 string of the profile picture
 }
 
 export enum EquipmentStatus {
@@ -22,11 +28,24 @@ export enum EquipmentStatus {
 }
 
 export interface Equipment {
-  id:string;
-  name: string;
+  id: string; // Correspond to "Placa"
+  // name field removed to avoid duplication.
+  description: string; // PRIMARY IDENTIFIER (Formerly "Descripción Original")
+  currentDescription?: string; // SECONDARY INFO (Formerly "Descripción Actual")
+  
   type: string;
   status: EquipmentStatus;
   imageUrl: string;
+  
+  // Extended Administrative Fields
+  regional?: string;
+  costCenter?: string; // Centro de Costo
+  module?: string;
+  model?: string;
+  consecutive?: string;
+  serial?: string;
+  acquisitionDate?: string;
+  value?: string; // Valor Ingreso
 }
 
 export interface LoanRecord {
@@ -36,33 +55,32 @@ export interface LoanRecord {
   instructorId: string;
   loanDate: Date;
   returnDate: Date | null;
-  photos: string[]; // Base64 data URLs - siempre debe ser un array (puede estar vacío [])
+  photos: string[]; // Base64 data URLs
   conditionAnalysis: string;
+  placa?: string; // Numero de inventario SENA
   returnPhotos?: string[]; // Base64 data URLs - opcional
-  placa?: string; // Optional SENA inventory plate number
-  returnConcept?: string; // Concepto del instructor al momento de la devolución
+  returnConditionAnalysis?: string;
+  returnConcept?: string;
+  returnStatus?: string; // Excelente, Bueno, Aceptable, Regular, Malo
 }
 
-/**
- * Crea un nuevo objeto LoanRecord con valores por defecto seguros y consistentes.
- * @param details - La información esencial para crear un nuevo préstamo.
- * @returns Un objeto LoanRecord completo y listo para ser almacenado.
- */
-export const createNewLoan = (details: {
-  id: string;
-  equipmentId: string;
-  borrowerId: string;
-  instructorId: string;
-  photos: string[];
-  conditionAnalysis: string;
-  placa?: string;
-}): LoanRecord => {
-  return {
-    ...details,
-    loanDate: new Date(),
-    returnDate: null,
-    // Aseguramos que los campos de devolución estén indefinidos al crear un préstamo
-    returnPhotos: undefined, 
-    returnConcept: undefined,
-  };
+export interface MaintenanceSuggestion {
+    equipmentId: string;
+    equipmentName: string; // Kept for AI response mapping, populated by description
+    suggestion: string;
+}
+
+export const createNewLoan = (data: Partial<LoanRecord>): LoanRecord => {
+    return {
+        id: data.id || `L${Date.now()}`,
+        equipmentId: data.equipmentId || '',
+        borrowerId: data.borrowerId || '',
+        instructorId: data.instructorId || '',
+        loanDate: data.loanDate || new Date(),
+        returnDate: null,
+        photos: data.photos || [],
+        conditionAnalysis: data.conditionAnalysis || '',
+        placa: data.placa,
+        returnStatus: '',
+    };
 };
