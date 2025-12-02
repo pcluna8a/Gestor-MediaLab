@@ -1,14 +1,13 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Role, User, LoanRecord, Equipment, EquipmentStatus, UserCategory } from './types';
+import React, { useState, useEffect } from 'react';
+import { Role, User, LoanRecord, Equipment, UserCategory } from './types';
 import { INITIAL_USERS } from './constants';
 import InstructorDashboard from './components/InstructorDashboard';
 import UserDashboard from './components/AprendizDashboard';
-import { LogoutIcon, SunIcon, MoonIcon, SaveIcon } from './components/Icons';
+import { LogoutIcon, SaveIcon } from './components/Icons';
 import { Toast, useToast } from './components/Toast';
 import Spinner from './components/Spinner';
 import Modal from './components/Modal';
-// Importar servicios de nube
 import { 
   subscribeToCollection, 
   registerNewLoanInCloud, 
@@ -16,49 +15,32 @@ import {
   addUserToCloud, 
   addEquipmentToCloud, 
   updateEquipmentImageInCloud,
-  initializeCloudDatabase,
   checkCloudConnection,
   updateEquipmentInCloud,
   deleteEquipmentInCloud,
   updateUserCredentials,
   updateUserInCloud,
-  hashPassword
+  hashPassword,
+  forceCloudSync
 } from './services/firebaseService';
 
 const getGreetingName = (fullName: string): string => {
   if (!fullName) return 'Usuario';
-  
-  // 1. Limpieza: Trim y espacios múltiples
   const cleanName = fullName.trim().replace(/\s+/g, ' ');
-  
-  // 2. Split por espacios
   const parts = cleanName.split(' ');
-  
-  // 3. Lógica de nombres
-  // Si tiene 3 o 4 partes, asumimos (Nombre [Nombre] Apellido Apellido)
-  // Tomamos la primera parte (Primer Nombre) y la penúltima (Primer Apellido) si es largo, 
-  // o simplemente el primero y el segundo si son pocos.
-  
   let firstName = parts[0];
   let lastName = '';
-
   if (parts.length >= 3) {
-      // Ej: Juan Carlos Perez Rodriguez -> Juan Perez
-      // Ej: Juan Perez Rodriguez -> Juan Perez
       lastName = parts[parts.length - 2];
   } else if (parts.length === 2) {
       lastName = parts[1];
   }
-
-  // 4. Capitalización (Primera mayúscula, resto minúscula)
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-  
   firstName = capitalize(firstName);
   if (lastName) {
       lastName = capitalize(lastName);
       return `${firstName} ${lastName}`;
   }
-  
   return firstName;
 };
 
@@ -105,7 +87,6 @@ const ForcePasswordChangeModal: React.FC<{ user: User; onUpdateSuccess: (newEmai
         setIsLoading(false);
     };
 
-    // Este modal no tiene botón de cierre (onClose) para obligar al usuario
     return (
         <div className="fixed inset-0 bg-black bg-opacity-80 z-[60] flex justify-center items-center p-4 backdrop-blur-sm">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-8 animate-scale-in border-2 border-sena-green">
@@ -127,7 +108,7 @@ const ForcePasswordChangeModal: React.FC<{ user: User; onUpdateSuccess: (newEmai
                             type="email" 
                             value={newEmail} 
                             onChange={e => setNewEmail(e.target.value)} 
-                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                             placeholder="usuario@sena.edu.co"
                         />
                     </div>
@@ -137,7 +118,7 @@ const ForcePasswordChangeModal: React.FC<{ user: User; onUpdateSuccess: (newEmai
                             type="password" 
                             value={newPassword} 
                             onChange={e => setNewPassword(e.target.value)} 
-                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                             placeholder="Mínimo 6 caracteres"
                         />
                     </div>
@@ -147,7 +128,7 @@ const ForcePasswordChangeModal: React.FC<{ user: User; onUpdateSuccess: (newEmai
                             type="password" 
                             value={confirmPassword} 
                             onChange={e => setConfirmPassword(e.target.value)} 
-                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         />
                     </div>
                     
@@ -162,7 +143,7 @@ const ForcePasswordChangeModal: React.FC<{ user: User; onUpdateSuccess: (newEmai
                         disabled={isLoading} 
                         className="w-full bg-sena-green text-white py-3 rounded-lg font-bold hover:bg-opacity-90 transition-all shadow-lg transform hover:scale-[1.02]"
                     >
-                        {isLoading ? <Spinner size="5" color="white" /> : 'Actualizar Credenciales y Continuar'}
+                        {isLoading ? <Spinner size="5" color="white" /> : 'Actualizar credenciales y continuar'}
                     </button>
                 </div>
             </div>
@@ -184,8 +165,6 @@ const ForgotPasswordModal: React.FC<{ isOpen: boolean; onClose: () => void; user
     const handleVerify = async () => {
         setError('');
         setIsLoading(true);
-        
-        // Simulación de retardo de red
         await new Promise(r => setTimeout(r, 1000));
 
         const user = users.find(u => u.id === id);
@@ -207,7 +186,6 @@ const ForgotPasswordModal: React.FC<{ isOpen: boolean; onClose: () => void; user
             return;
         }
 
-        // Si coincide, pasamos al paso 2
         setStep(2);
         setIsLoading(false);
     };
@@ -219,7 +197,6 @@ const ForgotPasswordModal: React.FC<{ isOpen: boolean; onClose: () => void; user
         setIsLoading(true);
         try {
             const newHash = await hashPassword(newPassword);
-            // No cambiamos el email, solo la pass
             await updateUserCredentials(id, email, newHash);
             setSuccessMsg("¡Contraseña restablecida con éxito! Ya puedes ingresar.");
             setTimeout(() => {
@@ -247,7 +224,15 @@ const ForgotPasswordModal: React.FC<{ isOpen: boolean; onClose: () => void; user
                         </p>
                         <div>
                             <label className="block text-sm font-bold dark:text-gray-300">ID Usuario</label>
-                            <input type="text" value={id} onChange={e => setId(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Número de documento" />
+                            <input 
+                                type="text" 
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={id} 
+                                onChange={e => setId(e.target.value.replace(/[^0-9]/g, ''))} 
+                                className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white" 
+                                placeholder="Número de documento" 
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-bold dark:text-gray-300">Correo Institucional</label>
@@ -290,14 +275,13 @@ const RoleSelector: React.FC<{ users: User[]; onSelect: (user: User) => void }> 
   const [selectedRole, setSelectedRole] = React.useState<Role | ''>('');
   const [selectedCategory, setSelectedCategory] = React.useState<UserCategory | ''>('');
   const [userId, setUserId] = React.useState('');
-  const [password, setPassword] = React.useState(''); // Campo para contraseña
-  const [rememberMe, setRememberMe] = React.useState(false); // Nuevo estado Remember Me
-  const [showForgotModal, setShowForgotModal] = React.useState(false); // Estado modal forgot
+  const [password, setPassword] = React.useState(''); 
+  const [rememberMe, setRememberMe] = React.useState(false); 
+  const [showForgotModal, setShowForgotModal] = React.useState(false); 
   
   const [error, setError] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   
-  // Cargar credenciales guardadas al inicio
   useEffect(() => {
       const savedRole = localStorage.getItem('ml_saved_role');
       const savedCat = localStorage.getItem('ml_saved_cat');
@@ -327,7 +311,8 @@ const RoleSelector: React.FC<{ users: User[]; onSelect: (user: User) => void }> 
       setError('Por favor, selecciona una categoría.');
       return;
     }
-    if (selectedRole === Role.INSTRUCTOR_MEDIALAB && !password) {
+    const isPrivileged = selectedRole === Role.INSTRUCTOR_MEDIALAB || selectedRole === Role.SUPER_ADMIN;
+    if (isPrivileged && !password) {
         setError('Por favor, ingresa tu contraseña.');
         return;
     }
@@ -339,7 +324,7 @@ const RoleSelector: React.FC<{ users: User[]; onSelect: (user: User) => void }> 
     const user = effectiveUsers.find(u =>
       u.id === userId &&
       u.role === selectedRole &&
-      (selectedRole === Role.INSTRUCTOR_MEDIALAB || u.category === selectedCategory)
+      (!isPrivileged || u.category === selectedCategory || !u.category)
     );
 
     if (!user) {
@@ -348,21 +333,26 @@ const RoleSelector: React.FC<{ users: User[]; onSelect: (user: User) => void }> 
         return;
     }
 
-    // 2. Validación de Contraseña para Instructor
-    if (selectedRole === Role.INSTRUCTOR_MEDIALAB) {
+    // 2. Validación de Contraseña para Instructor/Admin
+    if (isPrivileged) {
         let isValid = false;
         let requiresChange = false;
 
         if (user.passwordHash) {
-            // Usuario ya tiene hash, verificar
             const inputHash = await hashPassword(password);
             isValid = inputHash === user.passwordHash;
             requiresChange = !!user.forcePasswordChange;
         } else {
             // Fallback (Legacy o Primer Ingreso): Validar si password es igual al ID
             isValid = password === user.id;
+            // SPECIAL CHECK FOR INITIAL CONSTANTS
+            // If the user is in INITIAL_USERS and has an initialPassword, check that too
+            const constantUser = INITIAL_USERS.find(u => u.id === user.id);
+            if (constantUser && constantUser.initialPassword) {
+                isValid = password === constantUser.initialPassword;
+            }
+
             if (isValid) {
-                // Si entró con el ID, MARCAMOS que requiere cambio, pero LO DEJAMOS ENTRAR
                 requiresChange = true;
             }
         }
@@ -378,7 +368,6 @@ const RoleSelector: React.FC<{ users: User[]; onSelect: (user: User) => void }> 
         }
     }
 
-    // 3. Guardar en LocalStorage si Remember Me está activo
     if (rememberMe) {
         localStorage.setItem('ml_saved_role', selectedRole);
         if (selectedCategory) localStorage.setItem('ml_saved_cat', selectedCategory);
@@ -389,7 +378,6 @@ const RoleSelector: React.FC<{ users: User[]; onSelect: (user: User) => void }> 
         localStorage.removeItem('ml_saved_id');
     }
 
-    // Login Exitoso
     setError('');
     setIsLoading(false);
     onSelect(user);
@@ -398,6 +386,7 @@ const RoleSelector: React.FC<{ users: User[]; onSelect: (user: User) => void }> 
   const roleOrder: Role[] = [
     Role.USUARIO_MEDIALAB,
     Role.INSTRUCTOR_MEDIALAB,
+    Role.SUPER_ADMIN
   ];
 
   return (
@@ -442,19 +431,21 @@ const RoleSelector: React.FC<{ users: User[]; onSelect: (user: User) => void }> 
           )}
           <div>
             <label htmlFor="user-id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {selectedRole === Role.INSTRUCTOR_MEDIALAB ? 'Usuario (ID)' : 'Número de Identificación'}
+                {(selectedRole === Role.INSTRUCTOR_MEDIALAB || selectedRole === Role.SUPER_ADMIN) ? 'Usuario (ID)' : 'Número de Identificación'}
             </label>
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               id="user-id"
               value={userId}
               onChange={(e) => setUserId(e.target.value.replace(/[^0-9]/g, ''))}
               placeholder="Ingresa tu número de documento"
-              className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sena-dark dark:text-gray-200 focus:ring-2 focus:ring-sena-green focus:border-sena-green transition-colors"
+              className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sena-dark dark:text-gray-200 focus:ring-2 focus:ring-sena-green focus:border-sena-green transition-colors font-mono tracking-wide"
             />
           </div>
 
-          {selectedRole === Role.INSTRUCTOR_MEDIALAB && (
+          {(selectedRole === Role.INSTRUCTOR_MEDIALAB || selectedRole === Role.SUPER_ADMIN) && (
              <div className="animate-fade-in">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contraseña</label>
                 <input
@@ -506,313 +497,183 @@ const RoleSelector: React.FC<{ users: User[]; onSelect: (user: User) => void }> 
   );
 };
 
-// --- COMPONENTE PRINCIPAL APP ---
-function App() {
+// --- MAIN APP COMPONENT ---
+export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [equipment, setEquipment] = useState<Equipment[]>([]); 
+  const [users, setUsers] = useState<User[]>([]); 
   const [loans, setLoans] = useState<LoanRecord[]>([]);
-  const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  
-  // Estados de Conexión
+  const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(false);
-  const [isCheckingConnection, setIsCheckingConnection] = useState(true);
-  const [lastSync, setLastSync] = useState<Date | null>(null);
-
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
   const { toast, showToast, closeToast } = useToast();
 
-  // Inicialización y Network Watchdog
+  // Initial Data Load & Network Monitoring
   useEffect(() => {
-      const validateConnection = async () => {
-          const online = await checkCloudConnection();
-          setIsOnline(online);
-          setIsCheckingConnection(false);
-          if(online) setLastSync(new Date());
-      };
+    const init = async () => {
+       const connected = await checkCloudConnection();
+       setIsOnline(connected);
+       setLoading(false);
+    };
+    init();
 
-      validateConnection();
-      if (initializeCloudDatabase) initializeCloudDatabase(); // Try to trigger internal check
-
-      // 1. Watchdog Activo (Intervalo de 30s)
-      const heartbeat = setInterval(async () => {
-          const online = await checkCloudConnection();
-          if (online !== isOnline) {
-              setIsOnline(online);
-              if (online) {
-                  showToast("Conexión restablecida", "success");
-                  setLastSync(new Date());
-              } else {
-                  showToast("Sin conexión a servidor", "error");
-              }
-          }
-      }, 30000);
-
-      // 2. Listeners de Eventos de Navegador
-      const handleOnline = () => { 
-          setIsOnline(true); 
-          checkCloudConnection(); // Forzar validación real
-      };
-      const handleOffline = () => setIsOnline(false);
-      
-      // 3. Re-check al volver a la pestaña (Focus)
-      const handleVisibilityChange = () => {
-          if (document.visibilityState === 'visible') {
-              checkCloudConnection().then(online => setIsOnline(online));
-          }
-      };
-
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-
-      return () => {
-          clearInterval(heartbeat);
-          window.removeEventListener('online', handleOnline);
-          window.removeEventListener('offline', handleOffline);
-          document.removeEventListener('visibilitychange', handleVisibilityChange);
-      };
-  }, [isOnline]);
-
-  // Data Subscriptions
-  useEffect(() => {
-    // Solo suscribirse si creemos estar online o para iniciar la caché local
-    // subscribeToCollection maneja internamente el modo offline/online
-    
-    const unsubscribeEquipment = subscribeToCollection('equipment', (data) => {
-        // Detectar cambios remotos si ya teníamos datos
-        if (equipment.length > 0 && JSON.stringify(data) !== JSON.stringify(equipment) && isOnline) {
-             // Opcional: showToast("Inventario actualizado remotamente", "info");
-        }
+    // Setup Subscriptions
+    const unsubEq = subscribeToCollection('equipment', (data) => {
         setEquipment(data as Equipment[]);
-        setLastSync(new Date());
     });
-
-    const unsubscribeLoans = subscribeToCollection('loans', (data) => {
-        const parsedLoans = data.map((loan: any) => ({
-            ...loan,
-            loanDate: loan.loanDate ? new Date(loan.loanDate) : new Date(),
-            returnDate: loan.returnDate ? new Date(loan.returnDate) : null
-        }));
-        
-        // Comparar longitudes para detectar nuevos préstamos de otros usuarios
-        if (loans.length > 0 && parsedLoans.length !== loans.length && isOnline) {
-             showToast("Datos de préstamos actualizados", "info");
-        }
-        
-        setLoans(parsedLoans as LoanRecord[]);
-        setLastSync(new Date());
-    });
-
-    const unsubscribeUsers = subscribeToCollection('users', (data) => {
+    const unsubUsers = subscribeToCollection('users', (data) => {
         setUsers(data as User[]);
     });
+    const unsubLoans = subscribeToCollection('loans', (data) => {
+        const parsedLoans = data.map(l => ({
+            ...l,
+            loanDate: new Date(l.loanDate), // Ensure Date object
+            returnDate: l.returnDate ? new Date(l.returnDate) : null
+        }));
+        setLoans(parsedLoans as LoanRecord[]);
+    });
+
+    // Network Watchdog
+    const handleFocus = () => { checkCloudConnection().then(setIsOnline); };
+    window.addEventListener('focus', handleFocus);
+    const interval = setInterval(() => { checkCloudConnection().then(setIsOnline); }, 30000);
 
     return () => {
-        unsubscribeEquipment();
-        unsubscribeLoans();
-        unsubscribeUsers();
-    };
-  }, [isOnline]); // Re-suscribir si el estado online cambia para asegurar fresh socket
-
-  // Dark Mode logic
-  useEffect(() => {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setIsDarkMode(true);
+        unsubEq();
+        unsubUsers();
+        unsubLoans();
+        window.removeEventListener('focus', handleFocus);
+        clearInterval(interval);
     }
   }, []);
 
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
-
-  // Handlers
-  const handleNewLoan = async (loan: LoanRecord) => {
-    const result = await registerNewLoanInCloud(loan);
-    if (result.success) {
-        showToast("Préstamo registrado exitosamente", "success");
-    } else {
-        showToast(result.error || "Error al registrar préstamo", "error");
-    }
-  };
-
-  const handleReturn = async (loanId: string, concept: string, status: string, photos: string[] = [], analysis: string = '') => {
-      const loan = loans.find(l => l.id === loanId);
-      if (!loan) return;
-
-      const result = await registerReturnInCloud(loanId, loan.equipmentId, {
-          concept,
-          status,
-          photos,
-          analysis
-      });
-
-      if (result.success) {
-          showToast("Devolución registrada exitosamente", "success");
-      } else {
-          showToast(result.error || "Error al registrar devolución", "error");
+  const handleLogin = (user: User) => {
+      setCurrentUser(user);
+      if ((user.role === Role.INSTRUCTOR_MEDIALAB || user.role === Role.SUPER_ADMIN) && user.forcePasswordChange) {
+          setShowPasswordChangeModal(true);
       }
   };
 
-  const handleAddNewUser = (newUser: User) => {
-    const exists = users.some(u => u.id === newUser.id);
-    if (exists) return { success: false, message: 'El usuario ya existe.' };
-    
-    addUserToCloud(newUser);
-    showToast("Usuario agregado correctamente", "success");
-    return { success: true, message: 'Usuario agregado.' };
-  };
-
-  const handleUpdateUser = async (updatedUser: User) => {
-     await updateUserInCloud(updatedUser);
-     showToast("Usuario actualizado", "success");
-  };
-
-  const handleAddNewEquipment = (item: Equipment) => {
-      const exists = equipment.some(e => e.id === item.id);
-      if (exists) {
-          showToast("El código de equipo ya existe", "error");
-          return;
-      }
-      addEquipmentToCloud(item);
-      showToast("Equipo agregado al inventario", "success");
-  };
-
-  const handleUpdateEquipmentImage = (id: string, url: string) => {
-      updateEquipmentImageInCloud(id, url);
-      showToast("Imagen actualizada", "success");
-  };
-
-  const handleEditEquipment = async (item: Equipment) => {
-      const result = await updateEquipmentInCloud(item);
-      if (result.success) {
-          showToast("Equipo actualizado", "success");
-      } else {
-          showToast("Error al actualizar equipo", "error");
-      }
-  };
-
-  const handleDeleteEquipment = async (id: string) => {
-      const result = await deleteEquipmentInCloud(id);
-      if (result.success) {
-          showToast("Equipo eliminado", "success");
-      } else {
-          showToast("Error al eliminar equipo", "error");
-      }
+  const handleLogout = () => {
+      setCurrentUser(null);
+      localStorage.removeItem('ml_saved_id'); 
   };
 
   const handlePasswordUpdateSuccess = (newEmail: string, newHash: string) => {
       if (currentUser) {
-          // Actualizamos el estado local para quitar el bloqueo inmediatamente
-          setCurrentUser({
-              ...currentUser,
-              email: newEmail,
-              passwordHash: newHash,
-              forcePasswordChange: false
-          });
-          showToast("Credenciales actualizadas correctamente", "success");
+          const updatedUser = { ...currentUser, email: newEmail, passwordHash: newHash, forcePasswordChange: false };
+          setCurrentUser(updatedUser);
+          setShowPasswordChangeModal(false);
+          showToast("Contraseña actualizada correctamente.");
       }
   };
 
-  // Render
+  if (loading) return <div className="min-h-screen flex justify-center items-center bg-gray-100 dark:bg-sena-dark"><Spinner /></div>;
+
   if (!currentUser) {
-    return (
-        <>
+      return (
+          <>
+            <RoleSelector users={users.length > 0 ? users : INITIAL_USERS} onSelect={handleLogin} />
             {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
-            <RoleSelector users={users} onSelect={setCurrentUser} />
-        </>
-    );
+          </>
+      );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-sena-dark transition-colors duration-300 relative">
-      {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
-      
-      {/* MODAL DE CAMBIO DE CONTRASEÑA FORZADO - Solo aparece si el usuario ya entró y requiere cambio */}
-      {currentUser.role === Role.INSTRUCTOR_MEDIALAB && currentUser.forcePasswordChange && (
-          <ForcePasswordChangeModal user={currentUser} onUpdateSuccess={handlePasswordUpdateSuccess} />
-      )}
-      
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logoSena.png" onError={(e) => e.currentTarget.src = "https://www.sena.edu.co/Style%20Library/alayout/images/logoSena.png"} alt="SENA" className="h-10 w-10 dark:brightness-0 dark:invert" />
-            <div>
-              <h1 className="text-xl font-bold text-sena-green">MediaLab</h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Gestor de Préstamos - CIES</p>
-            </div>
-          </div>
+      <div className="min-h-screen bg-gray-100 dark:bg-sena-dark transition-colors duration-300">
+          <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-30">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                      <img src="/logoSena.png" alt="SENA" className="h-10 w-10 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                      <div>
+                          <h1 className="text-xl font-bold text-sena-green">MediaLab</h1>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Centro de la Industria, la Empresa y los Servicios</p>
+                      </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                      <div className="text-right hidden sm:block">
+                          <p className="text-sm font-bold text-gray-800 dark:text-white">{getGreetingName(currentUser.name)}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.role.replace(/_/g, ' ')}</p>
+                      </div>
+                      <button onClick={handleLogout} className="p-2 text-gray-500 hover:text-red-500 transition-colors" title="Cerrar Sesión">
+                          <LogoutIcon className="w-6 h-6" />
+                      </button>
+                  </div>
+              </div>
+          </header>
 
-          {/* Status Bar for Connectivity */}
-          <div className="hidden md:flex items-center gap-4 px-4 py-1 rounded-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-               <div className="flex items-center gap-2">
-                   <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                   <span className="text-xs font-bold text-gray-600 dark:text-gray-300">
-                       {isOnline ? 'CONECTADO A LA NUBE' : 'MODO LOCAL (OFFLINE)'}
-                   </span>
-               </div>
-               {isOnline && lastSync && (
-                   <span className="text-[10px] text-gray-400 border-l pl-3 border-gray-300 dark:border-gray-500">
-                       Última sync: {lastSync.toLocaleTimeString()}
-                   </span>
-               )}
-          </div>
+          <main className="p-4">
+              {currentUser.role === Role.USUARIO_MEDIALAB ? (
+                  <UserDashboard 
+                      currentUser={currentUser}
+                      loans={loans}
+                      equipment={equipment}
+                      users={users}
+                      onNewLoan={async (loan) => {
+                          const res = await registerNewLoanInCloud(loan);
+                          if(res.success) showToast("Préstamo registrado exitosamente");
+                          else showToast("Error al registrar préstamo", 'error');
+                      }}
+                  />
+              ) : (
+                  <InstructorDashboard 
+                      currentUser={currentUser}
+                      loans={loans}
+                      equipment={equipment}
+                      users={users}
+                      isOnline={isOnline}
+                      onNewLoan={async (loan) => {
+                          const res = await registerNewLoanInCloud(loan);
+                          if(res.success) showToast("Préstamo registrado");
+                          else showToast("Error: " + res.error, 'error');
+                      }}
+                      onReturn={async (loanId, concept, status, photos, analysis) => {
+                          const loan = loans.find(l => l.id === loanId);
+                          if (!loan) return;
+                          const res = await registerReturnInCloud(loanId, loan.equipmentId, { concept, status, photos, analysis });
+                          if(res.success) showToast("Devolución registrada");
+                          else showToast("Error devolución", 'error');
+                      }}
+                      onAddNewUser={async (newUser) => {
+                          await addUserToCloud(newUser);
+                          return { success: true, message: "Usuario creado" };
+                      }}
+                      onUpdateUser={async (u) => {
+                          await updateUserInCloud(u);
+                          showToast("Usuario actualizado");
+                      }}
+                      onAddNewEquipment={async (e) => {
+                          await addEquipmentToCloud(e);
+                          showToast("Equipo agregado");
+                      }}
+                      onUpdateEquipmentImage={async (id, url) => {
+                          await updateEquipmentImageInCloud(id, url);
+                      }}
+                      onEditEquipment={async (e) => {
+                          await updateEquipmentInCloud(e);
+                          showToast("Equipo actualizado");
+                      }}
+                      onDeleteEquipment={async (id) => {
+                          await deleteEquipmentInCloud(id);
+                          showToast("Equipo eliminado");
+                      }}
+                      onForceSync={async (onProgress) => {
+                          const res = await forceCloudSync(onProgress);
+                          if (res.success) showToast(res.message || "Sincronización completa");
+                          else showToast("Error: " + res.message, 'error');
+                      }}
+                      onUpdateInventory={() => {}}
+                      checkpointTimestamp={null}
+                      onCreateCheckpoint={() => {}}
+                  />
+              )}
+          </main>
+
+          {showPasswordChangeModal && (
+              <ForcePasswordChangeModal user={currentUser} onUpdateSuccess={handlePasswordUpdateSuccess} />
+          )}
           
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">{getGreetingName(currentUser.name)}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.role.replace(/_/g, ' ')}</p>
-            </div>
-            <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors">
-              {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
-            </button>
-            <button onClick={() => setCurrentUser(null)} className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors" title="Cerrar Sesión">
-              <LogoutIcon className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-        {/* Mobile Status Bar */}
-        <div className={`md:hidden h-1 w-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentUser.role === Role.INSTRUCTOR_MEDIALAB ? (
-          <InstructorDashboard
-            currentUser={currentUser}
-            loans={loans}
-            equipment={equipment}
-            users={users}
-            onNewLoan={handleNewLoan}
-            onReturn={handleReturn}
-            onUpdateInventory={() => {}} 
-            onAddNewUser={handleAddNewUser}
-            onUpdateUser={handleUpdateUser}
-            onAddNewEquipment={handleAddNewEquipment}
-            onUpdateEquipmentImage={handleUpdateEquipmentImage}
-            onEditEquipment={handleEditEquipment}
-            onDeleteEquipment={handleDeleteEquipment}
-            checkpointTimestamp={null}
-            onCreateCheckpoint={() => {}}
-            isOnline={isOnline}
-          />
-        ) : (
-          <UserDashboard
-            currentUser={currentUser}
-            loans={loans}
-            equipment={equipment}
-            users={users}
-            onNewLoan={handleNewLoan}
-          />
-        )}
-      </main>
-    </div>
+          {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
+      </div>
   );
-}
-
-export default App;
+};

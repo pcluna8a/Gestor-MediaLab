@@ -1,6 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 // Configuración de Firebase proporcionada por el usuario
 export const firebaseConfig = {
@@ -14,12 +15,15 @@ export const firebaseConfig = {
 
 let app;
 let dbInstance;
+let authInstance;
 
 try {
   app = initializeApp(firebaseConfig);
   dbInstance = getFirestore(app);
+  authInstance = getAuth(app);
 } catch (error) {
   console.error("Error inicializando Firebase:", error);
 }
 
 export const db = dbInstance;
+export const auth = authInstance;

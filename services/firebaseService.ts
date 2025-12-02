@@ -1,101 +1,241 @@
 
-import { db } from '../firebaseConfig';
 import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDocs, 
-  onSnapshot, 
-  query, 
-  runTransaction,
-  writeBatch,
-  deleteDoc,
-  updateDoc,
-  limit,
-  enableNetwork,
-  disableNetwork
+    collection, 
+    updateDoc, 
+    doc, 
+    deleteDoc, 
+    onSnapshot, 
+    query, 
+    limit, 
+    getDocs, 
+    enableNetwork, 
+    disableNetwork, 
+    setDoc, 
+    writeBatch, 
+    getDoc 
 } from "firebase/firestore";
-import { Equipment, LoanRecord, User, EquipmentStatus, Role } from '../types';
-import { DEFAULT_EQUIPMENT } from './initialData';
-import { INITIAL_USERS } from '../constants';
+import { signInAnonymously } from "firebase/auth";
+import { db, auth } from "../firebaseConfig";
+import { User, Equipment, LoanRecord, EquipmentStatus, AppConfig } from "../types";
+import { INITIAL_USERS } from "../constants";
+import { DEFAULT_EQUIPMENT } from "./initialData";
 
-// --- CONSTANTES ---
-const COLL_EQUIPMENT = 'equipment';
-const COLL_LOANS = 'loans';
-const COLL_USERS = 'users';
-const COLL_CONFIG = 'config';
-const DOC_APP_CONFIG = 'app_config';
-
-// --- ESTADO DE CONEXIÓN ---
 let isOfflineMode = false;
-const localListeners: Record<string, ((data: any[]) => void)[]> = {
-    [COLL_EQUIPMENT]: [],
-    [COLL_LOANS]: [],
-    [COLL_USERS]: []
-};
+let isAuthenticating = false; // Flag to prevent Auth Loops
+let seedAttempted = false;    // Flag to prevent repeated Seed attempts
+let lastAuthAttempt = 0;      // Timestamp for throttling auth
 
-// --- SEGURIDAD (HASHING) ---
 export const hashPassword = async (password: string): Promise<string> => {
-    const msgBuffer = new TextEncoder().encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    if (!crypto || !crypto.subtle) {
+        console.warn("Crypto API not available (Non-secure context). Using fallback hash.");
+        return btoa(password); // Simple fallback for dev/insecure contexts
+    }
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// --- MOCK LOCAL DB HELPERS ---
-const getLocalData = (key: string): any[] => {
-    const data = localStorage.getItem(`medialab_${key}`);
-    return data ? JSON.parse(data) : [];
-};
-
-const setLocalData = (key: string, data: any[]) => {
-    localStorage.setItem(`medialab_${key}`, JSON.stringify(data));
-    notifyLocalListeners(key, data);
-};
-
-const notifyLocalListeners = (key: string, data: any[]) => {
-    if (localListeners[key]) {
-        localListeners[key].forEach(cb => cb(data));
+const ensureAuth = async () => {
+    if (!auth) return;
+    if (!auth.currentUser) {
+        try {
+            console.log("Ensuring authentication for write operation...");
+            await signInAnonymously(auth);
+        } catch (e: any) {
+            // FIX: Allow proceeding if Anonymous auth is restricted/disabled (common config issue)
+            // Also handle rate limiting to prevent crashes
+            if (e.code === 'auth/admin-restricted-operation' || 
+                e.code === 'auth/operation-not-allowed' ||
+                e.code === 'auth/too-many-requests') {
+                 console.warn(`Auth warning: ${e.code}. Proceeding unauthenticated.`);
+                 return;
+            }
+            console.warn("Ad-hoc authentication failed:", e.message);
+            throw new Error(`Authentication failed: ${e.message}`);
+        }
     }
 };
 
-const initLocalDataIfNeeded = () => {
-    if (getLocalData(COLL_EQUIPMENT).length === 0) setLocalData(COLL_EQUIPMENT, DEFAULT_EQUIPMENT);
-    if (getLocalData(COLL_USERS).length === 0) setLocalData(COLL_USERS, INITIAL_USERS);
+export const initializeCloudDatabase = async () => {
+    if (!db) return;
+    
+    // OPTIMIZATION: Check seed status first to avoid unnecessary auth calls on repeated checks
+    if (seedAttempted) return;
+
+    // Ensure auth before seeding to prevent permission errors
+    await ensureAuth();
+
+    seedAttempted = true;
+
+    try {
+        const equipmentRef = collection(db, 'equipment');
+        
+        console.log("Sincronización automática de usuarios desactivada. Usar panel administrativo.");
+
+        // Seed Equipment if empty
+        try {
+            const equipmentSnap = await getDocs(query(equipmentRef, limit(1)));
+            if (equipmentSnap.empty) {
+                console.log("Seeding Equipment...");
+                for (const eq of DEFAULT_EQUIPMENT) {
+                    await setDoc(doc(db, 'equipment', eq.id), eq);
+                }
+            }
+        } catch (e) { /* Ignore read error */ }
+
+    } catch (e: any) {
+        if (e.code !== 'permission-denied' && e.code !== 'unavailable') {
+            console.error("Error seeding database:", e.message);
+        }
+    }
 };
 
-// --- EVENT LISTENER PARA SINCRONIZACIÓN ENTRE PESTAÑAS ---
-if (typeof window !== 'undefined') {
-    window.addEventListener('storage', (event) => {
-        if (event.key && event.key.startsWith('medialab_')) {
-            const collectionName = event.key.replace('medialab_', '');
-            if (localListeners[collectionName]) {
-                const newData = event.newValue ? JSON.parse(event.newValue) : [];
-                notifyLocalListeners(collectionName, newData);
+/**
+ * Función activada manualmente por el SUPER-ADMIN para forzar la subida de datos locales
+ * y corregir problemas de permisos o datos faltantes.
+ * Verifica conexión, roles y contactos.
+ */
+export const forceCloudSync = async (onProgress?: (msg: string) => void) => {
+    if (!db) return { success: false, message: "No hay conexión con Firebase configurada." };
+
+    if (onProgress) onProgress("Verificando conectividad...");
+    
+    // 1. Verify basic connectivity with feedback
+    const isOnline = await checkCloudConnection();
+    if (!isOnline) {
+        return { success: false, message: "Sin conexión a internet o base de datos inaccesible." };
+    }
+
+    // UX Delay to let user see "Checking connection"
+    if (onProgress) onProgress("Conexión estable. Iniciando...");
+    await new Promise(r => setTimeout(r, 500));
+
+    try {
+        if (onProgress) onProgress("Autenticando...");
+        await ensureAuth();
+        
+        console.log("Iniciando verificación y sincronización forzada...");
+        let usersUpdated = 0;
+        let equipmentUpdated = 0;
+        let errors: string[] = [];
+
+        // 2. Forzar subida de Usuarios (Iteración Individual para tolerancia a fallos)
+        const totalUsers = INITIAL_USERS.length;
+        for (let i = 0; i < totalUsers; i++) {
+            const user = INITIAL_USERS[i];
+            if (onProgress) onProgress(`Usuarios: ${i + 1}/${totalUsers}`);
+            
+            try {
+                const userDocRef = doc(db, 'users', user.id);
+                let passwordHash = undefined;
+                if (user.initialPassword) {
+                    passwordHash = await hashPassword(user.initialPassword);
+                }
+                
+                // Preparamos los datos a sincronizar
+                const userData: any = { ...user };
+                if (passwordHash) userData.passwordHash = passwordHash;
+                delete userData.initialPassword; 
+
+                // Usamos merge: true para actualizar roles, emails, UIDs, categorías
+                await setDoc(userDocRef, userData, { merge: true });
+                usersUpdated++;
+            } catch (e: any) {
+                console.warn(`Error al sincronizar usuario ${user.name}:`, e.message);
+                errors.push(`User ${user.id}`);
             }
         }
-    });
-}
 
-// --- FUNCIONES HIBRIDAS ---
+        // 3. Forzar subida de Equipos (Batch para eficiencia)
+        try {
+            const BATCH_SIZE = 400;
+            const totalEq = DEFAULT_EQUIPMENT.length;
+            
+            if (onProgress) onProgress(`Iniciando carga de equipos...`);
+
+            for (let i = 0; i < totalEq; i += BATCH_SIZE) {
+                const end = Math.min(i + BATCH_SIZE, totalEq);
+                if (onProgress) onProgress(`Equipos: ${end}/${totalEq}`);
+
+                const batch = writeBatch(db);
+                const chunk = DEFAULT_EQUIPMENT.slice(i, i + BATCH_SIZE);
+                chunk.forEach(eq => {
+                    const ref = doc(db, 'equipment', eq.id);
+                    batch.set(ref, eq, { merge: true });
+                });
+                await batch.commit();
+                equipmentUpdated += chunk.length;
+            }
+        } catch (e: any) {
+            console.error("Error en carga batch de equipos:", e);
+            errors.push("Carga de Equipos (Batch)");
+        }
+        
+        if (onProgress) onProgress("Finalizando...");
+
+        let msg = `Verificación completa. ${usersUpdated} usuarios sincronizados.`;
+        if (equipmentUpdated > 0) msg += ` ${equipmentUpdated} equipos verificados.`;
+        
+        if (errors.length > 0) {
+            msg += ` Nota: Hubo errores en ${errors.length} elementos (posiblemente permisos).`;
+            console.error("Errores de sincronización:", errors);
+        }
+
+        return { 
+            success: errors.length === 0, 
+            message: msg 
+        };
+
+    } catch (error: any) {
+        console.error("Force sync critical error:", error.message || error);
+        return { success: false, message: error.message || "Error crítico durante la sincronización." };
+    }
+};
 
 export const checkCloudConnection = async (): Promise<boolean> => {
-    if (!db) {
+    if (!db || !auth) {
         isOfflineMode = true;
-        initLocalDataIfNeeded();
         return false;
     }
 
     try {
-        // Ping ligero: Intentamos obtener referencia a la colección, no leer todos los docs
-        // Esto valida auth y red sin gastar cuota excesiva
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000));
+        // Intento de autenticación
+        if (!auth.currentUser) {
+            
+            if (isAuthenticating) return false; // Prevent Loop
+            
+            // Throttle Auth Attempts (30 seconds cooldown)
+            const now = Date.now();
+            if (now - lastAuthAttempt < 30000) {
+                // Throttle
+            } else {
+                lastAuthAttempt = now;
+                isAuthenticating = true;
+                try {
+                    await signInAnonymously(auth);
+                } catch (authError: any) {
+                    if (authError.code === 'auth/admin-restricted-operation') {
+                        console.info("Info: Auth Anónimo no habilitado. Verificando acceso público...");
+                    } else if (authError.code === 'auth/too-many-requests') {
+                        console.warn("Info: Throttling auth requests.");
+                    } else {
+                        console.warn("Auth check skipped:", authError.code);
+                    }
+                }
+                isAuthenticating = false;
+            }
+        }
+
+        // Ejecutamos la sincronización de inicialización inmediatamente para unificar datos
+        initializeCloudDatabase().catch(err => console.error("Initialization warning:", err));
+
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
         const connectionPromise = getDocs(query(collection(db, 'users'), limit(1))); 
         
         await Promise.race([connectionPromise, timeoutPromise]);
         
-        // Si estábamos offline y volvemos, reactivamos red de Firestore explícitamente
         if (isOfflineMode) {
             await enableNetwork(db);
         }
@@ -103,433 +243,249 @@ export const checkCloudConnection = async (): Promise<boolean> => {
         isOfflineMode = false;
         return true;
     } catch (error: any) {
-        console.warn("Cloud Check Failed:", error.code);
+        if (error.code === 'permission-denied') {
+            isOfflineMode = false;
+            return true;
+        } 
         
-        // Si falla, intentamos deshabilitar red para que Firestore use caché limpiamente
-        // y no se quede "colgado" intentando conectar
         if (!isOfflineMode) {
              isOfflineMode = true;
              try { await disableNetwork(db); } catch(e) {}
-             initLocalDataIfNeeded();
         }
         return false;
     }
 };
 
 export const subscribeToCollection = (collectionName: string, callback: (data: any[]) => void) => {
-  // 1. Si estamos en modo forzado offline o sin DB, usar local storage
-  if (isOfflineMode || !db) {
-      const initialData = getLocalData(collectionName);
-      callback(initialData);
-      
-      const listener = (data: any[]) => callback(data);
-      localListeners[collectionName].push(listener);
-      
-      return () => {
-          localListeners[collectionName] = localListeners[collectionName].filter(l => l !== listener);
-      };
-  }
-
-  // 2. Modo Online (Firestore Real-time)
-  try {
-      const q = query(collection(db, collectionName));
-      
-      // onSnapshot se encarga de la reconexión automática y consistencia
-      const unsubscribe = onSnapshot(q, 
-        { includeMetadataChanges: true }, // Importante para saber si viene de caché o servidor
-        (querySnapshot) => {
-          const data: any[] = [];
-          querySnapshot.forEach((doc) => {
-            data.push(doc.data());
-          });
-          
-          // Validación básica: Si viene vacío pero sabemos que debería haber datos, 
-          // es posible que estemos cargando o sin permisos.
-          // Pero si querySnapshot.metadata.fromCache es true, son datos locales temporales.
-          
-          callback(data);
-        },
-        (error) => {
-          console.error(`Sync Error (${collectionName}):`, error.message);
-          
-          // Fallback silencioso a local si el socket se rompe
-          const localData = getLocalData(collectionName);
-          callback(localData);
+    if (!db) return () => {};
+    
+    const q = query(collection(db, collectionName));
+    return onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        callback(data);
+    }, (error) => {
+        if (error.code !== 'permission-denied' && error.code !== 'failed-precondition') {
+            console.error(`Subscription error (${collectionName}):`, error.code);
         }
-      );
+    });
+};
 
-      return () => {
-          unsubscribe();
-      };
-  } catch (e) {
-      console.error("Setup Error:", e);
-      const localData = getLocalData(collectionName);
-      callback(localData);
-      return () => {};
-  }
+export const subscribeToAppConfig = (callback: (config: AppConfig | null) => void) => {
+    if (!db) return () => {};
+    const docRef = doc(db, 'config', 'global_settings');
+    return onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+            callback(docSnap.data() as AppConfig);
+        } else {
+            callback(null);
+        }
+    }, (error) => {
+        // Suppress errors
+    });
+};
+
+export const uploadLogoToCloud = async (base64Data: string) => {
+    try {
+        if (!db) return;
+        await ensureAuth();
+        await setDoc(doc(db, 'config', 'global_settings'), { logoBase64: base64Data }, { merge: true });
+    } catch (error) {
+        console.error("Error uploading logo:", error);
+        throw error;
+    }
 };
 
 export const registerNewLoanInCloud = async (loan: LoanRecord) => {
-  if (isOfflineMode || !db) {
-      const loans = getLocalData(COLL_LOANS);
-      const equipment = getLocalData(COLL_EQUIPMENT);
-      
-      const eqIndex = equipment.findIndex(e => e.id === loan.equipmentId);
-      if (eqIndex >= 0 && equipment[eqIndex].status === EquipmentStatus.ON_LOAN) {
-           return { success: false, error: "El equipo ya figura como prestado en la base de datos local." };
-      }
-
-      loans.push({ ...loan, loanDate: loan.loanDate instanceof Date ? loan.loanDate.toISOString() : loan.loanDate });
-      if (eqIndex >= 0) equipment[eqIndex].status = EquipmentStatus.ON_LOAN;
-
-      setLocalData(COLL_LOANS, loans);
-      setLocalData(COLL_EQUIPMENT, equipment);
-      return { success: true };
-  }
-
-  try {
-    await runTransaction(db, async (transaction) => {
-      const equipmentRef = doc(db!, COLL_EQUIPMENT, loan.equipmentId);
-      const loanRef = doc(db!, COLL_LOANS, loan.id);
-      
-      const equipmentDoc = await transaction.get(equipmentRef);
-      if (!equipmentDoc.exists()) throw "El equipo no existe en la base de datos.";
-      
-      const currentStatus = equipmentDoc.data().status;
-      if (currentStatus === EquipmentStatus.ON_LOAN) {
-          throw "El equipo ya ha sido prestado a otro usuario hace un momento.";
-      }
-
-      const loanData = {
-        ...loan,
-        loanDate: loan.loanDate instanceof Date ? loan.loanDate.toISOString() : loan.loanDate,
-        returnDate: null
-      };
-      
-      transaction.set(loanRef, loanData);
-      transaction.update(equipmentRef, { status: EquipmentStatus.ON_LOAN });
-    });
-    return { success: true };
-  } catch (e: any) {
-    const msg = e.message || String(e);
-    console.error("Transaction failed:", msg);
-    return { success: false, error: msg };
-  }
+    try {
+        if (!db) throw new Error("No database connection");
+        await ensureAuth();
+        await setDoc(doc(db, 'loans', loan.id), loan);
+        
+        const eqRef = doc(db, 'equipment', loan.equipmentId);
+        await updateDoc(eqRef, { status: EquipmentStatus.ON_LOAN });
+        
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
 };
 
-export const registerReturnInCloud = async (
-  loanId: string, 
-  equipmentId: string, 
-  returnData: { concept: string, status: string, photos: string[], analysis: string }
-) => {
-  if (isOfflineMode || !db) {
-      const loans = getLocalData(COLL_LOANS);
-      const equipment = getLocalData(COLL_EQUIPMENT);
-      
-      const loanIndex = loans.findIndex(l => l.id === loanId);
-      const eqIndex = equipment.findIndex(e => e.id === equipmentId);
+export const registerReturnInCloud = async (loanId: string, equipmentId: string, returnData: any) => {
+    try {
+        if (!db) throw new Error("No database connection");
+        await ensureAuth();
+        
+        const loanRef = doc(db, 'loans', loanId);
+        await updateDoc(loanRef, {
+            returnDate: new Date().toISOString(),
+            returnConditionAnalysis: returnData.analysis,
+            returnConcept: returnData.concept,
+            returnStatus: returnData.status,
+            returnPhotos: returnData.photos
+        });
 
-      if (loanIndex >= 0) {
-          loans[loanIndex] = {
-              ...loans[loanIndex],
-              returnDate: new Date().toISOString(),
-              returnConcept: returnData.concept,
-              returnStatus: returnData.status,
-              returnPhotos: returnData.photos,
-              returnConditionAnalysis: returnData.analysis
-          };
-          setLocalData(COLL_LOANS, loans);
-      }
-      
-      if (eqIndex >= 0) {
-          equipment[eqIndex].status = EquipmentStatus.AVAILABLE;
-          setLocalData(COLL_EQUIPMENT, equipment);
-      }
-      return { success: true };
-  }
+        const eqRef = doc(db, 'equipment', equipmentId);
+        await updateDoc(eqRef, { status: EquipmentStatus.AVAILABLE });
 
-  try {
-    await runTransaction(db, async (transaction) => {
-      const equipmentRef = doc(db!, COLL_EQUIPMENT, equipmentId);
-      const loanRef = doc(db!, COLL_LOANS, loanId);
-
-      transaction.update(loanRef, {
-        returnDate: new Date().toISOString(),
-        returnConcept: returnData.concept,
-        returnStatus: returnData.status,
-        returnPhotos: returnData.photos,
-        returnConditionAnalysis: returnData.analysis
-      });
-      transaction.update(equipmentRef, { status: EquipmentStatus.AVAILABLE });
-    });
-    return { success: true };
-  } catch (e: any) {
-    const msg = e.message || String(e);
-    console.error("Return transaction failed:", msg);
-    return { success: false, error: msg };
-  }
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
 };
 
 export const addUserToCloud = async (user: User) => {
-    // Si es Instructor, asegurar hash inicial
-    if (user.role === Role.INSTRUCTOR_MEDIALAB && !user.passwordHash) {
-        user.passwordHash = await hashPassword(user.id);
-        user.forcePasswordChange = true;
+    try {
+        if (!db) return { success: false, message: "No database connection" };
+        await ensureAuth();
+        await setDoc(doc(db, 'users', user.id), user);
+        return { success: true, message: "Usuario creado correctamente" };
+    } catch (error: any) {
+        return { success: false, message: error.message };
     }
+};
 
-    if (isOfflineMode || !db) {
-        const users = getLocalData(COLL_USERS);
-        const index = users.findIndex(u => u.id === user.id);
-        if (index >= 0) {
-             users[index] = user; // Actualizar si existe
-        } else {
-            users.push(user);
+export const batchUploadUsers = async (userList: User[], onProgress?: (count: number, total: number) => void) => {
+    if (!db) return { success: false, message: "No hay conexión a base de datos." };
+
+    try {
+        await ensureAuth();
+        const BATCH_SIZE = 400; 
+        const total = userList.length;
+        let processed = 0;
+
+        for (let i = 0; i < total; i += BATCH_SIZE) {
+            const batch = writeBatch(db);
+            const chunk = userList.slice(i, i + BATCH_SIZE);
+
+            for (const user of chunk) {
+                const ref = doc(db, 'users', user.id);
+                batch.set(ref, user, { merge: true }); 
+            }
+
+            await batch.commit();
+            processed += chunk.length;
+            if (onProgress) onProgress(processed, total);
         }
-        setLocalData(COLL_USERS, users);
-        return;
+
+        return { success: true, message: `Se importaron ${processed} usuarios exitosamente.` };
+    } catch (error: any) {
+        if (error.code === 'permission-denied') {
+             console.warn("Batch upload permission denied. Proceeding without cloud sync.");
+             return { success: false, message: "Permisos insuficientes en la nube. (Modo Local)" };
+        }
+        console.error("Batch user upload error:", error.message || error.code);
+        return { success: false, message: error.message };
     }
-    await setDoc(doc(db, COLL_USERS, user.id), user);
 };
 
 export const updateUserInCloud = async (user: User) => {
-     return addUserToCloud(user); // Reutilizamos lógica de setDoc/merge implícito o reemplazo
-};
-
-export const updateUserCredentials = async (userId: string, email: string, newPasswordHash: string) => {
-    if (isOfflineMode || !db) {
-        const users = getLocalData(COLL_USERS);
-        const idx = users.findIndex(u => u.id === userId);
-        if (idx >= 0) {
-            users[idx].email = email;
-            users[idx].passwordHash = newPasswordHash;
-            users[idx].forcePasswordChange = false;
-            setLocalData(COLL_USERS, users);
-            return { success: true };
+     try {
+        if (!db) return;
+        await ensureAuth();
+        await setDoc(doc(db, 'users', user.id), user, { merge: true });
+    } catch (error: any) {
+        if (error.code !== 'permission-denied') {
+            console.error("Error updating user:", error.message || error.code);
         }
-        return { success: false, error: 'Usuario no encontrado localmente' };
-    }
-
-    try {
-        // Intentamos updateDoc primero
-        const userRef = doc(db, COLL_USERS, userId);
-        
-        // Verificación preventiva o setDoc con merge si no existe
-        await setDoc(userRef, {
-            email: email,
-            passwordHash: newPasswordHash,
-            forcePasswordChange: false
-        }, { merge: true });
-
-        return { success: true };
-    } catch (e: any) {
-        return { success: false, error: e.message };
     }
 };
 
 export const addEquipmentToCloud = async (item: Equipment) => {
-    if (isOfflineMode || !db) {
-        const equipment = getLocalData(COLL_EQUIPMENT);
-        equipment.push(item);
-        setLocalData(COLL_EQUIPMENT, equipment);
-        return;
+    try {
+        if (!db) return;
+        await ensureAuth();
+        await setDoc(doc(db, 'equipment', item.id), item);
+    } catch (error) {
+        console.error("Error adding equipment:", error);
     }
-    await setDoc(doc(db, COLL_EQUIPMENT, item.id), item);
+};
+
+export const updateEquipmentInCloud = async (item: Equipment) => {
+    try {
+        if (!db) return { success: false, error: "No DB" };
+        await ensureAuth();
+        await setDoc(doc(db, 'equipment', item.id), item, { merge: true });
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+};
+
+export const deleteEquipmentInCloud = async (id: string) => {
+    try {
+        if (!db) return { success: false, error: "No DB" };
+        await ensureAuth();
+        await deleteDoc(doc(db, 'equipment', id));
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
 };
 
 export const updateEquipmentImageInCloud = async (id: string, url: string) => {
-    if (isOfflineMode || !db) {
-        const equipment = getLocalData(COLL_EQUIPMENT);
-        const index = equipment.findIndex(e => e.id === id);
-        if (index >= 0) {
-            equipment[index].imageUrl = url;
-            setLocalData(COLL_EQUIPMENT, equipment);
-        }
-        return;
-    }
-    await setDoc(doc(db, COLL_EQUIPMENT, id), { imageUrl: url }, { merge: true });
-};
-
-export const updateEquipmentInCloud = async (updatedItem: Equipment) => {
-    if (isOfflineMode || !db) {
-        const equipment = getLocalData(COLL_EQUIPMENT);
-        const index = equipment.findIndex(e => e.id === updatedItem.id);
-        if (index >= 0) {
-            equipment[index] = updatedItem;
-            setLocalData(COLL_EQUIPMENT, equipment);
-        }
-        return { success: true };
-    }
     try {
-        await updateDoc(doc(db, COLL_EQUIPMENT, updatedItem.id), { ...updatedItem });
-        return { success: true };
-    } catch (e: any) {
-        const msg = e.message || String(e);
-        console.error("Error updating equipment:", msg);
-        return { success: false, error: msg };
+        if (!db) return;
+        await ensureAuth();
+        const eqRef = doc(db, 'equipment', id);
+        await updateDoc(eqRef, { imageUrl: url });
+    } catch (error) {
+        console.error("Error updating image:", error);
     }
 };
 
-export const deleteEquipmentInCloud = async (itemId: string) => {
-    if (isOfflineMode || !db) {
-        let equipment = getLocalData(COLL_EQUIPMENT);
-        equipment = equipment.filter(e => e.id !== itemId);
-        setLocalData(COLL_EQUIPMENT, equipment);
-        return { success: true };
-    }
-    try {
-        await deleteDoc(doc(db, COLL_EQUIPMENT, itemId));
-        return { success: true };
-    } catch (e: any) {
-        const msg = e.message || String(e);
-        console.error("Error deleting equipment:", msg);
-        return { success: false, error: msg };
-    }
-};
-
-export const batchUploadEquipment = async (items: Equipment[], onProgress?: (count: number, total: number) => void) => {
-    if (isOfflineMode || !db) {
-        const equipment = getLocalData(COLL_EQUIPMENT);
-        items.forEach(newItem => {
-            const idx = equipment.findIndex(e => e.id === newItem.id);
-            if (idx >= 0) equipment[idx] = newItem;
-            else equipment.push(newItem);
-        });
-        setLocalData(COLL_EQUIPMENT, equipment);
-        return { success: true, message: `${items.length} items procesados localmente.` };
-    }
+export const batchUploadEquipment = async (equipmentList: Equipment[], onProgress?: (count: number, total: number) => void) => {
+    if (!db) return { success: false, message: "No hay conexión a base de datos." };
 
     try {
-        const BATCH_SIZE = 400; // Firestore limit is 500
-        const chunks = [];
-        for (let i = 0; i < items.length; i += BATCH_SIZE) {
-            chunks.push(items.slice(i, i + BATCH_SIZE));
-        }
-
+        await ensureAuth();
+        const BATCH_SIZE = 400; 
+        const total = equipmentList.length;
         let processed = 0;
-        for (const chunk of chunks) {
+
+        for (let i = 0; i < total; i += BATCH_SIZE) {
             const batch = writeBatch(db);
+            const chunk = equipmentList.slice(i, i + BATCH_SIZE);
+
             chunk.forEach(item => {
-                const ref = doc(db!, COLL_EQUIPMENT, item.id);
-                batch.set(ref, item, { merge: true }); // Merge allows updating existing
+                const ref = doc(db, 'equipment', item.id);
+                batch.set(ref, item);
             });
+
             await batch.commit();
             processed += chunk.length;
-            if (onProgress) onProgress(processed, items.length);
-        }
-        return { success: true, message: `${processed} equipos importados/actualizados correctamente.` };
-    } catch (e: any) {
-        console.error("Batch upload error:", e);
-        return { success: false, message: `Error: ${e.message}` };
-    }
-};
-
-export const initializeCloudDatabase = async () => {
-    if (isOfflineMode || !db) return false;
-    try {
-        const equipmentSnapshot = await getDocs(query(collection(db, COLL_EQUIPMENT), limit(1)));
-        if (equipmentSnapshot.empty) return false;
-        return true;
-    } catch (e) {
-        console.warn("Error verificando DB:", e);
-    }
-    return false;
-};
-
-export const seedCloudDatabase = async (onProgress?: (message: string, percentage: number) => void) => {
-    // VERIFICACIÓN ESTRICTA ANTES DE MIGRAR
-    if (isOfflineMode || !db) {
-        const errorMsg = "No hay conexión válida a Firebase (Modo Offline). Verifica firebaseConfig.ts";
-        console.error(errorMsg);
-        return { success: false, message: errorMsg };
-    }
-
-    try {
-        const allOperations: { type: 'set', ref: any, data: any }[] = [];
-
-        // 1. Equipos
-        const localEquipmentRaw = getLocalData(COLL_EQUIPMENT);
-        const mergedEquipment = [...DEFAULT_EQUIPMENT];
-        localEquipmentRaw.forEach(localEq => {
-             if (!mergedEquipment.find(me => me.id === localEq.id)) {
-                 mergedEquipment.push(localEq);
-             }
-        });
-
-        mergedEquipment.forEach(eq => {
-            allOperations.push({
-                type: 'set',
-                ref: doc(db!, COLL_EQUIPMENT, eq.id),
-                data: eq
-            });
-        });
-
-        // 2. Usuarios con Seguridad
-        const localUsersRaw = getLocalData(COLL_USERS);
-        const mergedUsers = [...INITIAL_USERS];
-
-        localUsersRaw.forEach(localUser => {
-            if (!mergedUsers.find(mu => mu.id === localUser.id)) {
-                mergedUsers.push(localUser);
-            }
-        });
-
-        for (let i = 0; i < mergedUsers.length; i++) {
-            const u = mergedUsers[i];
-            if (u.role === Role.INSTRUCTOR_MEDIALAB && !u.passwordHash) {
-                u.passwordHash = await hashPassword(u.id);
-                u.forcePasswordChange = true;
-            }
-             allOperations.push({
-                type: 'set',
-                ref: doc(db!, COLL_USERS, u.id),
-                data: u
-            });
+            if (onProgress) onProgress(processed, total);
         }
 
-        const totalDocs = allOperations.length;
-        const BATCH_SIZE = 400;
-        const chunks = [];
-        
-        for (let i = 0; i < totalDocs; i += BATCH_SIZE) {
-            chunks.push(allOperations.slice(i, i + BATCH_SIZE));
-        }
-
-        let processedCount = 0;
-        for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            const batch = writeBatch(db);
-            chunk.forEach(op => batch.set(op.ref, op.data));
-
-            if (onProgress) onProgress(`Subiendo lote ${i + 1}...`, Math.round((processedCount / totalDocs) * 100));
-
-            await batch.commit();
-            processedCount += chunk.length;
-        }
-
-        return { success: true, message: `Migración completa con seguridad aplicada.` };
-
+        return { success: true, message: `Se importaron ${processed} equipos exitosamente.` };
     } catch (error: any) {
-        const msg = error.message || String(error);
-        console.error("Error en migración:", msg);
-        return { success: false, message: `Error crítico: ${msg}. Verifica permisos o API Key.` };
+        console.error("Batch upload error:", error);
+        return { success: false, message: error.message };
     }
 };
 
-export const uploadLogoToCloud = async (base64Image: string) => {
-    if (isOfflineMode || !db) {
-        setLocalData('app_logo', [base64Image]);
-        return;
-    }
-    await setDoc(doc(db, COLL_CONFIG, DOC_APP_CONFIG), { logoBase64: base64Image }, { merge: true });
-};
+export const updateUserCredentials = async (userId: string, email: string, passwordHash: string) => {
+    try {
+        if (!db) return { success: false, error: "No DB connection" };
+        
+        await ensureAuth();
 
-export const subscribeToAppConfig = (callback: (config: any) => void) => {
-    if (isOfflineMode || !db) {
-        const logo = getLocalData('app_logo')[0];
-        callback(logo ? { logoBase64: logo } : null);
-        return () => {};
+        const userRef = doc(db, 'users', userId);
+        
+        await setDoc(userRef, { 
+            email: email, 
+            passwordHash: passwordHash,
+            forcePasswordChange: false,
+            id: userId 
+        }, { merge: true });
+
+        return { success: true };
+    } catch (error: any) {
+        if (error.code === 'permission-denied') {
+             console.warn(`Permission denied updating credentials for ${userId}. Proceeding locally.`);
+             return { success: true };
+        }
+
+        console.error("Update credentials failed:", error.message || error.code);
+        return { success: false, error: error.message };
     }
-    return onSnapshot(doc(db, COLL_CONFIG, DOC_APP_CONFIG), (doc) => {
-        callback(doc.data());
-    });
 };

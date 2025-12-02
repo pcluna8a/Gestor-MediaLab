@@ -1,95 +1,26 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { User, LoanRecord, Equipment, Role, EquipmentStatus, createNewLoan } from '../types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { User, LoanRecord, Equipment, EquipmentStatus, Role, createNewLoan } from '../types';
+import { 
+  CameraIcon, PlusCircleIcon, ClipboardListIcon, DownloadIcon, SearchIcon,
+  DocumentReportIcon, HistoryIcon, HomeIcon, SwitchCameraIcon
+} from './Icons';
 import { CameraCapture } from './CameraCapture';
 import { readInventoryLabel } from '../services/geminiService';
 import Spinner from './Spinner';
-import { CameraIcon, DownloadIcon, HistoryIcon, PlusCircleIcon, ClipboardListIcon } from './Icons';
-import jsPDF from 'jspdf';
 
-type Tab = 'myLoans' | 'newLoan';
-
-interface UserDashboardProps {
-  currentUser: User;
-  loans: LoanRecord[];
-  equipment: Equipment[];
-  users: User[];
-  onNewLoan: (loan: LoanRecord) => void;
+export interface UserDashboardProps {
+    currentUser: User;
+    loans: LoanRecord[];
+    equipment: Equipment[];
+    users: User[];
+    onNewLoan: (loan: LoanRecord) => void;
 }
 
-const TabButton: React.FC<{ icon: React.ReactNode, text: string, isActive: boolean, onClick: () => void }> = ({ icon, text, isActive, onClick }) => (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 py-4 px-3 border-b-2 font-medium text-sm transition-colors ${
-        isActive
-          ? 'border-sena-green text-sena-green'
-          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
-      }`}
-    >
-      {icon} {text}
-    </button>
-);
+export type Tab = 'newLoan' | 'myLoans';
 
-const MyLoansView: React.FC<Pick<UserDashboardProps, 'currentUser' | 'loans' | 'equipment' | 'users'>> = ({ currentUser, loans, equipment, users }) => {
-    const myLoans = (loans || []).filter(loan => loan.borrowerId === currentUser.id).sort((a,b) => b.loanDate.getTime() - a.loanDate.getTime());
-  
-    return (
-      <div className="max-w-5xl mx-auto animate-fade-in">
-        <h2 className="text-2xl font-bold text-sena-dark dark:text-white mb-4">Mis Préstamos de Equipo</h2>
-        {myLoans.length === 0 ? (
-          <div className="text-center bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
-            <p className="text-gray-500 dark:text-gray-400">No tienes préstamos actuales o pasados.</p>
-            <p className="mt-2 text-sm text-gray-400">Puedes solicitar un equipo en la pestaña "Solicitar Préstamo".</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {myLoans.map(loan => {
-              const equipmentItem = (equipment || []).find(e => e.id === loan.equipmentId);
-              const instructor = users.find(i => i.id === loan.instructorId && i.role === Role.INSTRUCTOR_MEDIALAB);
-  
-              return (
-                <div key={loan.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-all hover:shadow-lg">
-                  <img src={equipmentItem?.imageUrl || 'https://via.placeholder.com/150'} alt={equipmentItem?.description} className="w-32 h-32 object-cover rounded-md flex-shrink-0"/>
-                  <div className="flex-grow">
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-white">{equipmentItem?.description}</h2>
-                    <p className="text-sm font-mono text-gray-500 dark:text-gray-400">Código: {equipmentItem?.id}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Prestado el: {loan.loanDate.toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Instructor a cargo: {instructor?.name || 'No Aplica'}</p>
-                    {loan.returnDate && loan.returnConcept && (
-                        <p className="text-xs mt-2 italic text-blue-600 dark:text-blue-300">
-                            <span className="font-semibold">Concepto del Instructor:</span> "{loan.returnConcept}"
-                        </p>
-                    )}
-                     {loan.returnStatus && (
-                         <p className="text-xs mt-1 text-gray-600 dark:text-gray-400">
-                            <span className="font-semibold">Estado Devolución:</span> <span className={`px-2 py-0.5 rounded ${loan.returnStatus === 'Excelente' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{loan.returnStatus}</span>
-                         </p>
-                     )}
-                  </div>
-                  <div className="flex-shrink-0 text-right">
-                    {loan.returnDate ? (
-                       <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          Devuelto
-                       </span>
-                    ) : (
-                      <span className="px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                          En Préstamo
-                      </span>
-                    )}
-                     {loan.returnDate && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Devuelto: {loan.returnDate.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}</p>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-};
-
-interface CartItem {
+export interface CartItem {
     equipment: Equipment;
-    codeUsed: string;
 }
 
 const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equipment' | 'users' | 'onNewLoan'> & { setActiveTab: (tab: Tab) => void }> = ({ currentUser, equipment, users, onNewLoan, setActiveTab }) => {
@@ -107,7 +38,6 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
     
     const instructors = useMemo(() => (users || []).filter(u => u.role === Role.INSTRUCTOR_MEDIALAB), [users]);
     
-    // Effect to find equipment when code changes
     useEffect(() => {
         if (inventoryCode.length > 4) {
             const eq = equipment.find(e => e.id === inventoryCode);
@@ -117,247 +47,52 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
         }
     }, [inventoryCode, equipment]);
 
-    const handleScanLabel = async (photo: string) => {
-        setIsScanning(true);
-        setScanningError('');
-        const code = await readInventoryLabel(photo);
-        if (code && code !== "NO_FOUND" && code !== "ERROR") {
+    const handleScanLabel = async (photoB64: string) => {
+        setIsScanning(false);
+        setInventoryCode('Leyendo...');
+        const code = await readInventoryLabel(photoB64);
+        if (code && code !== 'NO_FOUND' && code !== 'ERROR') {
             setInventoryCode(code);
         } else {
-            setScanningError("No se pudo identificar un código numérico claro. Intenta ingresarlo manualmente.");
+            setInventoryCode('');
+            setScanningError('No se pudo detectar un código válido.');
         }
-        setIsScanning(false);
     };
 
     const addToCart = () => {
-        if (!foundEquipment) return;
-        
-        // Validar si ya está en el carrito
-        if (cart.some(item => item.equipment.id === foundEquipment.id)) {
-            alert("Este equipo ya está en tu lista.");
-            return;
+        if (foundEquipment && !cart.find(i => i.equipment.id === foundEquipment.id)) {
+            setCart([...cart, { equipment: foundEquipment }]);
+            setInventoryCode('');
+            setFoundEquipment(null);
         }
-
-        setCart([...cart, { equipment: foundEquipment, codeUsed: inventoryCode }]);
-        setInventoryCode(''); // Limpiar para el siguiente
-        setFoundEquipment(null);
     };
 
     const removeFromCart = (id: string) => {
-        setCart(cart.filter(item => item.equipment.id !== id));
+        setCart(cart.filter(i => i.equipment.id !== id));
     };
 
     const resetForm = () => {
+        setCart([]);
         setSelectedInstructor('');
         setInventoryCode('');
         setFoundEquipment(null);
-        setCart([]);
-        setScanningError('');
-        setIsSubmitting(false);
         setSubmissionSuccess(false);
     };
 
-    const getBase64ImageFromURL = (url: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'Anonymous';
-            img.src = url;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) {
-                    reject(new Error("Could not get canvas context"));
-                    return;
-                }
-                ctx.drawImage(img, 0, 0);
-                try {
-                    const dataURL = canvas.toDataURL('image/png');
-                    resolve(dataURL);
-                } catch (e) {
-                    reject(e);
-                }
-            };
-            img.onerror = (error) => reject(error);
-        });
-    };
-
-    const generateConsolidatedPDF = async (loansData: {id: string, item: Equipment}[], instructorName: string) => {
-        const doc = new jsPDF();
-        const margin = 20;
-        let y = margin;
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-
-        // 1. LOGO SENA
-        let logoBase64: string | null = null;
-        try {
-            try {
-                logoBase64 = await getBase64ImageFromURL("/logoSena.png");
-            } catch {
-                try {
-                    const externalUrl = "https://www.sena.edu.co/Style%20Library/alayout/images/logoSena.png"; 
-                    logoBase64 = await getBase64ImageFromURL(externalUrl);
-                } catch {}
-            }
-
-            if (logoBase64) {
-                const imgWidth = 25;
-                const imgHeight = 25;
-                const x = (pageWidth - imgWidth) / 2;
-                doc.addImage(logoBase64, 'PNG', x, y, imgWidth, imgHeight);
-                y += 30; 
-            } else {
-                 doc.setFontSize(18);
-                 doc.setFont("helvetica", "bold");
-                 doc.setTextColor(57, 169, 0); // SENA Green
-                 doc.text("SENA - MEDIALAB", pageWidth / 2, y + 10, { align: "center" });
-                 y += 25;
-            }
-        } catch {
-            y += 20;
-        }
-
-        // 2. TITULO
-        doc.setFontSize(16);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 0, 0);
-        doc.text("COMPROBANTE DE PRÉSTAMO (CONSOLIDADO)", pageWidth / 2, y, { align: "center" });
-        y += 7;
-        doc.setFontSize(12);
-        doc.setTextColor(50, 50, 50);
-        doc.text("MEDIALAB - CIES", pageWidth / 2, y, { align: "center" });
-        y += 15;
-
-        // DATOS
-        doc.setFontSize(10);
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "normal");
-        doc.text(`Fecha: ${new Date().toLocaleString()}`, margin, y);
-        y += 10;
-
-        // SOLICITANTE
-        doc.setFillColor(240, 240, 240);
-        doc.rect(margin, y, pageWidth - (margin * 2), 8, 'F');
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(57, 169, 0);
-        doc.text("DATOS DEL SOLICITANTE", margin + 2, y + 6);
-        y += 12;
-
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.text(`Nombre: ${currentUser.name}`, margin, y);
-        doc.text(`Identificación: ${currentUser.id}`, margin, y + 5);
-        doc.text(`Rol: ${currentUser.role} ${currentUser.category ? `(${currentUser.category})` : ''}`, margin, y + 10);
-        y += 20;
-
-        // EQUIPOS (LISTA)
-        doc.setFillColor(240, 240, 240);
-        doc.rect(margin, y, pageWidth - (margin * 2), 8, 'F');
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(57, 169, 0);
-        doc.text(`EQUIPOS EN PRÉSTAMO (${loansData.length})`, margin + 2, y + 6);
-        y += 12;
-
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-
-        loansData.forEach((entry, index) => {
-            if (y > pageHeight - 40) {
-                doc.addPage();
-                y = 20;
-            }
-            doc.setFont("helvetica", "bold");
-            doc.text(`${index + 1}. ${entry.item.description}`, margin, y);
-            doc.setFont("helvetica", "normal");
-            const modelInfo = entry.item.model ? ` - Modelo: ${entry.item.model}` : '';
-            doc.text(`   Placa: ${entry.item.id} - Tipo: ${entry.item.type}${modelInfo}`, margin, y + 5);
-            
-            if (entry.item.currentDescription) {
-                doc.setFontSize(9);
-                doc.setTextColor(80, 80, 80);
-                const descLines = doc.splitTextToSize(`Detalle: ${entry.item.currentDescription}`, pageWidth - (margin * 2) - 20);
-                doc.text(descLines, margin + 5, y + 10);
-                y += (descLines.length * 4) + 2;
-                doc.setFontSize(10);
-                doc.setTextColor(0, 0, 0);
-            } else {
-                y += 5;
-            }
-
-            doc.text(`   ID Préstamo: ${entry.id}`, pageWidth - margin, y - 5, { align: "right" });
-            y += 7;
-        });
-        y += 5;
-
-        // RESPONSABILIDAD
-        doc.setFillColor(240, 240, 240);
-        doc.rect(margin, y, pageWidth - (margin * 2), 8, 'F');
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(57, 169, 0);
-        doc.text("RESPONSABILIDAD", margin + 2, y + 6);
-        y += 12;
-
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.text(`Instructor Responsable: ${instructorName}`, margin, y);
-        y += 20;
-
-        // NOTA LEGAL
-        doc.setFontSize(9);
-        doc.setTextColor(80, 80, 80);
-        doc.setFont("helvetica", "italic");
-        // Ajuste a plural para coincidir con carrito
-        const disclaimer = "Al generarse este documento digital, el solicitante se hace responsable del cuidado y buen uso de los equipos descritos, comprometiéndose a devolverlos en las mismas o mejores condiciones en que fueron recibidos.";
-        const splitDisclaimer = doc.splitTextToSize(disclaimer, pageWidth - (margin * 2));
-        doc.text(splitDisclaimer, margin, y);
-
-        // PIE
-        const footerY = pageHeight - 15;
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(100, 100, 100);
-        doc.text("Centro de la Industria, la Empresa y los Servicios", pageWidth / 2, footerY, { align: "center" });
-        doc.setFont("helvetica", "normal");
-        doc.text("Regional Huila - SENA, Neiva", pageWidth / 2, footerY + 5, { align: "center" });
-
-        doc.save(`Prestamo_MediaLab_Consolidado_${Date.now()}.pdf`);
-    };
-
-    const handleFinalizeLoan = () => {
-        if (cart.length === 0 || !selectedInstructor) return;
+    const handleFinalizeLoan = async () => {
         setIsSubmitting(true);
-
-        const loansGenerated: {id: string, item: Equipment}[] = [];
-        
-        // Registrar cada equipo individualmente
-        cart.forEach(cartItem => {
-            const loanId = `L${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-            const newLoan = createNewLoan({
-                id: loanId,
+        // Simulate processing for each item
+        for (const item of cart) {
+            const loan = createNewLoan({
+                equipmentId: item.equipment.id,
                 borrowerId: currentUser.id,
                 instructorId: selectedInstructor,
-                equipmentId: cartItem.equipment.id,
-                placa: cartItem.codeUsed,
-                photos: [cartItem.equipment.imageUrl],
-                conditionAnalysis: "Asignado vía Sistema (Múltiple)",
+                placa: item.equipment.id
             });
-            onNewLoan(newLoan);
-            loansGenerated.push({ id: loanId, item: cartItem.equipment });
-        });
-
-        const instructorName = users.find(u => u.id === selectedInstructor)?.name || "Instructor";
-        generateConsolidatedPDF(loansGenerated, instructorName);
-
-        setSubmissionSuccess(true);
+            await onNewLoan(loan);
+        }
         setIsSubmitting(false);
+        setSubmissionSuccess(true);
     };
 
     if (submissionSuccess) {
@@ -370,7 +105,7 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
                 </div>
                 <h2 className="text-2xl font-bold text-sena-green">¡Préstamo Múltiple Registrado!</h2>
                 <p className="text-gray-600 dark:text-gray-300">
-                    Se ha generado un único PDF con la lista de todos los equipos solicitados.
+                    Se han registrado los préstamos correctamente.
                 </p>
                 <div className="flex justify-center items-center gap-4 mt-6">
                     <button onClick={resetForm} className="px-6 py-2 bg-sena-green text-white font-bold rounded-lg hover:bg-opacity-80 transition-colors">
@@ -388,7 +123,7 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
         <div className="space-y-8 max-w-4xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md animate-fade-in">
             <div>
                 <h2 className="text-2xl font-bold text-sena-dark dark:text-white">Solicitar Préstamo de Equipo</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Agrega los equipos que necesitas a la lista y genera un solo comprobante.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Agrega los equipos que necesitas a la lista.</p>
             </div>
             
             {/* Section 1: Instructor */}
@@ -417,6 +152,8 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
                          <div className="flex gap-2">
                             <input
                                 type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={inventoryCode}
                                 onChange={(e) => setInventoryCode(e.target.value.replace(/[^0-9]/g, ''))}
                                 placeholder="Ej: 10100113..."
@@ -457,7 +194,7 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
                         {foundEquipment ? (
                             <div className="border-2 border-sena-green bg-green-50 dark:bg-green-900/20 p-4 rounded-lg flex flex-col gap-3 animate-scale-in">
                                 <div className="flex gap-4 items-center">
-                                    <img src={foundEquipment.imageUrl} alt={foundEquipment.description} className="w-20 h-20 object-cover rounded-md bg-white"/>
+                                    {foundEquipment.imageUrl && <img src={foundEquipment.imageUrl} alt={foundEquipment.description} className="w-20 h-20 object-cover rounded-md bg-white"/>}
                                     <div>
                                         <p className="text-xs font-bold text-sena-green uppercase tracking-wide">Equipo Identificado</p>
                                         <h3 className="font-bold text-lg leading-tight dark:text-white">{foundEquipment.description}</h3>
@@ -523,31 +260,98 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
                     disabled={isSubmitting || cart.length === 0 || !selectedInstructor}
                     className="w-full md:w-auto px-8 py-3 bg-sena-green text-white font-bold rounded-lg hover:bg-opacity-90 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {isSubmitting ? <><Spinner size="5" color="white" /> Procesando...</> : "Finalizar y Generar Comprobante"}
+                    {isSubmitting ? <><Spinner size="5" color="white" /> Procesando...</> : "Finalizar y Registrar"}
                 </button>
             </div>
         </div>
     );
 };
 
-const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, loans, equipment, users, onNewLoan }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('newLoan');
+const MyLoansView: React.FC<{ currentUser: User, loans: LoanRecord[] }> = ({ currentUser, loans }) => {
+    const myLoans = loans.filter(l => l.borrowerId === currentUser.id);
+    const activeLoans = myLoans.filter(l => !l.returnDate);
+    const historyLoans = myLoans.filter(l => l.returnDate);
 
-  return (
-    <div className="w-full">
-      <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-6 overflow-x-auto whitespace-nowrap" aria-label="Tabs">
-          <TabButton icon={<CameraIcon className="w-5 h-5"/>} text="Solicitar Préstamo" isActive={activeTab === 'newLoan'} onClick={() => setActiveTab('newLoan')} />
-          <TabButton icon={<HistoryIcon className="w-5 h-5"/>} text="Mis Préstamos" isActive={activeTab === 'myLoans'} onClick={() => setActiveTab('myLoans')} />
-        </nav>
-      </div>
+    return (
+        <div className="space-y-6 animate-fade-in">
+             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                    <ClipboardListIcon className="w-6 h-6 text-sena-green" /> Mis Préstamos Activos
+                </h3>
+                {activeLoans.length === 0 ? (
+                    <p className="text-gray-500">No tienes equipos en tu poder actualmente.</p>
+                ) : (
+                    <div className="grid gap-4">
+                        {activeLoans.map(loan => (
+                            <div key={loan.id} className="border-l-4 border-sena-green bg-green-50 dark:bg-green-900/20 p-4 rounded shadow-sm">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-bold text-lg dark:text-white">{loan.equipmentId}</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-300">Solicitado: {new Date(loan.loanDate).toLocaleDateString()}</p>
+                                    </div>
+                                    <span className="px-2 py-1 bg-green-200 text-green-800 text-xs font-bold rounded">EN USO</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+             </div>
 
-      <div>
-        {activeTab === 'myLoans' && <MyLoansView currentUser={currentUser} loans={loans} equipment={equipment} users={users} />}
-        {activeTab === 'newLoan' && <NewLoanRequestForm currentUser={currentUser} equipment={equipment} users={users} onNewLoan={onNewLoan} setActiveTab={setActiveTab} />}
-      </div>
-    </div>
-  );
+             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md opacity-80">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                    <HistoryIcon className="w-6 h-6 text-gray-500" /> Historial de Devoluciones
+                </h3>
+                {historyLoans.length === 0 ? (
+                    <p className="text-gray-500">No hay historial disponible.</p>
+                ) : (
+                    <div className="grid gap-4">
+                        {historyLoans.slice(0, 5).map(loan => (
+                            <div key={loan.id} className="border p-3 rounded dark:border-gray-700 flex justify-between items-center">
+                                 <div>
+                                    <p className="font-bold text-sm dark:text-white">{loan.equipmentId}</p>
+                                    <p className="text-xs text-gray-500">Devuelto: {loan.returnDate ? new Date(loan.returnDate).toLocaleDateString() : 'N/A'}</p>
+                                </div>
+                                <span className="text-xs text-gray-500">{loan.returnStatus}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+             </div>
+        </div>
+    );
+};
+
+const UserDashboard: React.FC<UserDashboardProps> = (props) => {
+    const [activeTab, setActiveTab] = useState<Tab>('newLoan');
+
+    return (
+        <div className="min-h-[calc(100vh-8rem)]">
+            <div className="flex justify-center mb-6">
+                <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-md inline-flex">
+                    <button
+                        onClick={() => setActiveTab('newLoan')}
+                        className={`px-6 py-2 rounded-lg font-bold transition-all ${activeTab === 'newLoan' ? 'bg-sena-green text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                    >
+                        Solicitar Préstamo
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('myLoans')}
+                        className={`px-6 py-2 rounded-lg font-bold transition-all ${activeTab === 'myLoans' ? 'bg-sena-green text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                    >
+                        Mis Préstamos
+                    </button>
+                </div>
+            </div>
+
+            <div className="animate-fade-in-up">
+                {activeTab === 'newLoan' ? (
+                    <NewLoanRequestForm {...props} setActiveTab={setActiveTab} />
+                ) : (
+                    <MyLoansView currentUser={props.currentUser} loans={props.loans} />
+                )}
+            </div>
+        </div>
+    );
 };
 
 export default UserDashboard;

@@ -1,5 +1,5 @@
-
 export enum Role {
+  SUPER_ADMIN = 'SUPER-ADMIN',
   USUARIO_MEDIALAB = 'USUARIO-MEDIALAB',
   INSTRUCTOR_MEDIALAB = 'INSTRUCTOR-MEDIALAB',
 }
@@ -18,8 +18,10 @@ export interface User {
   // Security Fields
   email?: string;
   passwordHash?: string; // Stored as SHA-256 hash
+  initialPassword?: string; // Optional: Used only for seeding specific passwords from constants
   forcePasswordChange?: boolean; // True if user must change password on next login
   photoURL?: string; // Base64 string of the profile picture
+  UID?: string; // Firebase Auth UID linkage
 }
 
 export enum EquipmentStatus {
@@ -68,6 +70,10 @@ export interface MaintenanceSuggestion {
     equipmentId: string;
     equipmentName: string; // Kept for AI response mapping, populated by description
     suggestion: string;
+}
+
+export interface AppConfig {
+    logoBase64?: string;
 }
 
 export const createNewLoan = (data: Partial<LoanRecord>): LoanRecord => {
