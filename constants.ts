@@ -1,22 +1,8 @@
+
 import { User, Role, UserCategory } from './types';
 
 export const INITIAL_USERS: User[] = [
-  { 
-    id: '999999999', 
-    name: 'SUPER ADMINISTRADOR', 
-    role: Role.SUPER_ADMIN,
-    initialPassword: 'Niyibacu', // Contraseña específica solicitada
-    forcePasswordChange: false
-  },
-  { 
-    id: '79653359', 
-    name: 'PAULO CESAR LUNA OCHOA', 
-    role: Role.INSTRUCTOR_MEDIALAB,
-    initialPassword: 'Jucanicomapa', // Contraseña específica solicitada
-    forcePasswordChange: false,
-    email: 'plunao@sena.edu.co',
-    UID: 'WoTGfXBMFISYpPmrUBiT45l77kI3'
-  },
+  { id: '999999999', name: 'SUPER ADMINISTRADOR', role: Role.INSTRUCTOR_MEDIALAB }, // Acceso de respaldo
   { id: '1076906283', name: 'RUBER ARIEL MONTEALEGRE PAREDES', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },
   { id: '1010150164', name: 'KENNETH FERNANDO RESTREPO HERNANDEZ', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },
   { id: '1048994103', name: 'ESTHEFANY ESTRADA RIZO', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },
@@ -105,6 +91,7 @@ export const INITIAL_USERS: User[] = [
   { id: '1079534321', name: 'VALENTINA FORERO ROJAS', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },
   { id: '1006517385', name: 'PAULA ANDREA CRUZ OTALORA', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },
   { id: '1077723484', name: 'DIEGO ALEJANDRO ROJAS MORALES', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },
+  { id: '79653359', name: 'PAULO CESAR LUNA OCHOA', role: Role.INSTRUCTOR_MEDIALAB },
   { id: '1075229132', name: 'JOHAN EDISSON RUBIANO GUTIERREZ', role: Role.INSTRUCTOR_MEDIALAB },
   { id: '80123456', name: 'CARLOS ANDRES RAMIREZ', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },
   { id: '52987654', name: 'SOFIA GOMEZ PEREZ', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ },

@@ -1,5 +1,5 @@
+
 export enum Role {
-  SUPER_ADMIN = 'SUPER-ADMIN',
   USUARIO_MEDIALAB = 'USUARIO-MEDIALAB',
   INSTRUCTOR_MEDIALAB = 'INSTRUCTOR-MEDIALAB',
 }
@@ -7,7 +7,7 @@ export enum Role {
 export enum UserCategory {
   APRENDIZ = 'APRENDIZ',
   ADMINISTRATIVO = 'ADMINISTRATIVO',
-  INSTRUCTOR_SENA = 'INSTRUCTOR_SENA', // Compañeros SENA de otras áreas
+  INSTRUCTOR = 'INSTRUCTOR',
 }
 
 export interface User {
@@ -18,10 +18,7 @@ export interface User {
   // Security Fields
   email?: string;
   passwordHash?: string; // Stored as SHA-256 hash
-  initialPassword?: string; // Optional: Used only for seeding specific passwords from constants
   forcePasswordChange?: boolean; // True if user must change password on next login
-  photoURL?: string; // Base64 string of the profile picture
-  UID?: string; // Firebase Auth UID linkage
 }
 
 export enum EquipmentStatus {
@@ -30,24 +27,11 @@ export enum EquipmentStatus {
 }
 
 export interface Equipment {
-  id: string; // Correspond to "Placa"
-  // name field removed to avoid duplication.
-  description: string; // PRIMARY IDENTIFIER (Formerly "Descripción Original")
-  currentDescription?: string; // SECONDARY INFO (Formerly "Descripción Actual")
-  
+  id:string;
+  name: string;
   type: string;
   status: EquipmentStatus;
   imageUrl: string;
-  
-  // Extended Administrative Fields
-  regional?: string;
-  costCenter?: string; // Centro de Costo
-  module?: string;
-  model?: string;
-  consecutive?: string;
-  serial?: string;
-  acquisitionDate?: string;
-  value?: string; // Valor Ingreso
 }
 
 export interface LoanRecord {
@@ -68,12 +52,8 @@ export interface LoanRecord {
 
 export interface MaintenanceSuggestion {
     equipmentId: string;
-    equipmentName: string; // Kept for AI response mapping, populated by description
+    equipmentName: string;
     suggestion: string;
-}
-
-export interface AppConfig {
-    logoBase64?: string;
 }
 
 export const createNewLoan = (data: Partial<LoanRecord>): LoanRecord => {

@@ -1,27 +1,19 @@
 
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { LoanRecord, Equipment, MaintenanceSuggestion } from '../types';
-import { firebaseConfig } from '../firebaseConfig';
 
-// Helper to safely get API Key
+// Helper to safely get API Key without crashing if 'process' is undefined
 const getApiKey = () => {
   try {
-    // 1. Try process.env (Build time / Environment) - Safe check
     // @ts-ignore
-    if (typeof process !== 'undefined' && process?.env?.API_KEY) {
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
       // @ts-ignore
       return process.env.API_KEY;
     }
-    
-    // 2. Fallback to Firebase Config Key (Runtime) - Assuming Gemini API is enabled on the same project
-    if (firebaseConfig && firebaseConfig.apiKey) {
-        return firebaseConfig.apiKey;
-    }
-
   } catch (e) {
-    console.warn("Error reading API Key:", e);
+    console.warn("Error reading API Key from environment:", e);
   }
-  return "MISSING_API_KEY";
+  return "MISSING_API_KEY"; // Prevents constructor crash, though API calls will fail if key is missing
 };
 
 const ai = new GoogleGenAI({ apiKey: getApiKey() });
@@ -45,7 +37,7 @@ export const analyzeEquipmentCondition = async (photoB64: string, prompt: string
     return response.text || "No se pudo analizar la imagen.";
   } catch (error) {
     console.error("Error analyzing image:", error);
-    return "No se pudo completar el análisis IA. Verifique la conexión o la clave API.";
+    return "Error al analizar el estado de la imagen.";
   }
 };
 
@@ -92,7 +84,7 @@ export const generateLoanReportAnalysis = async (loanData: any[]): Promise<strin
       Formatea la respuesta en puntos claros y concisos.
     `;
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', 
+      model: 'gemini-2.5-flash', // Changed to flash for better speed/quota
       contents: prompt
     });
     return response.text || "No se pudo generar el análisis.";
@@ -131,7 +123,7 @@ export const generateMaintenanceSuggestions = async (loans: LoanRecord[], equipm
             const loanCount = itemLoans.length;
             return {
                 id: e.id,
-                name: e.description, // Fixed: Use description as name was removed
+                name: e.name,
                 loanCount,
             };
         }).filter(e => e.loanCount > 0);
