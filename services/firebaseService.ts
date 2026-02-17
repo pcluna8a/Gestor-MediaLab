@@ -1,17 +1,18 @@
 
 import { db, auth } from '../firebaseConfig';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDocs, 
-  onSnapshot, 
-  query, 
-  runTransaction,
-  writeBatch,
-  deleteDoc,
-  updateDoc,
-  limit
+import {
+    collection,
+    doc,
+    setDoc,
+    getDocs,
+    onSnapshot,
+    query,
+    runTransaction,
+    writeBatch,
+    deleteDoc,
+    updateDoc,
+    limit,
+    where
 } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
 import { Equipment, LoanRecord, User, EquipmentStatus, Role } from '../types';
@@ -76,15 +77,82 @@ if (typeof window !== 'undefined') {
 }
 
 // --- AUTH HELPER ---
-const ensureAuth = async () => {
-    if (!auth) return;
-    if (!auth.currentUser) {
-        try {
-            await signInAnonymously(auth);
-        } catch (error) {
-            console.warn("Anonymous auth failed, proceeding locally:", error);
-        }
+import {
+    signInWithEmailAndPassword,
+    signOut,
+    createUserWithEmailAndPassword,
+    onAuthStateChanged,
+    User as FirebaseUser
+} from "firebase/auth";
+
+// --- NUEVOS MÉTODOS DE AUTENTICACIÓN ---
+
+// Login para Instructores (Email/Password)
+export const loginInstructor = async (email: string, password: string) => {
+    if (!auth) return { success: false, error: "Firebase Auth no inicializado" };
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        return { success: true, user: userCredential.user };
+    } catch (error: any) {
+        console.error("Login error:", error.code, error.message);
+        return { success: false, error: error.message };
     }
+};
+
+// Login para Aprendices (Anónimo + Registro en Firestore si es nuevo)
+export const loginStudent = async (id: string, category: string, name: string = 'Usuario') => {
+    if (!auth || !db) return { success: false, error: "Servicios no inicializados" };
+    try {
+        // 1. Autenticación Anónima para tener sesión segura
+        await signInAnonymously(auth);
+
+        // 2. Buscar o Crear usuario en Firestore
+        const userRef = doc(db, COLL_USERS, id);
+        const userSnap = await getDocs(query(collection(db, COLL_USERS), where('id', '==', id), limit(1))); // Buscamos por campo ID interno, no UID de Auth
+
+        let userData: User;
+
+        if (!userSnap.empty) {
+            // Usuario ya existe
+            userData = userSnap.docs[0].data() as User;
+            // Actualizar categoría si cambió (opcional)
+            if (userData.category !== category) {
+                await updateDoc(userSnap.docs[0].ref, { category });
+                userData.category = category as any;
+            }
+        } else {
+            // Crear nuevo usuario estudiante
+            userData = {
+                id: id,
+                name: name,
+                role: Role.USUARIO_MEDIALAB,
+                category: category as any
+            };
+            await setDoc(userRef, userData);
+        }
+
+        return { success: true, user: userData };
+    } catch (error: any) {
+        console.error("Student login error:", error);
+        return { success: false, error: error.message };
+    }
+};
+
+export const logoutUser = async () => {
+    if (!auth) return;
+    try {
+        await signOut(auth);
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+};
+
+const ensureAuth = async () => {
+    // Ya no necesitamos forzar login anónimo automáticamente si vamos a tener login explícito
+    // Pero para modo offline/lectura pública podría ser útil.
+    // Lo mantenemos simple: Si no hay usuario, las reglas de seguridad bloquearán escrituras.
+    return;
 };
 
 // --- FUNCIONES HIBRIDAS ---
@@ -99,12 +167,12 @@ export const checkCloudConnection = async (): Promise<boolean> => {
 
     try {
         await ensureAuth();
-        
+
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
-        const connectionPromise = getDocs(query(collection(db, 'users'), limit(1))); 
-        
+        const connectionPromise = getDocs(query(collection(db, 'users'), limit(1)));
+
         await Promise.race([connectionPromise, timeoutPromise]);
-        
+
         isOfflineMode = false;
         return true;
     } catch (error: any) {
@@ -116,10 +184,10 @@ export const checkCloudConnection = async (): Promise<boolean> => {
         }
 
         if (error.code === 'unavailable' || error.message === 'Timeout') {
-             console.warn("Cloud Connection Failed (Network):", error.message);
-             isOfflineMode = true;
-             initLocalDataIfNeeded();
-             return false;
+            console.warn("Cloud Connection Failed (Network):", error.message);
+            isOfflineMode = true;
+            initLocalDataIfNeeded();
+            return false;
         }
         isOfflineMode = false;
         return true;
@@ -127,165 +195,165 @@ export const checkCloudConnection = async (): Promise<boolean> => {
 };
 
 export const subscribeToCollection = (collectionName: string, callback: (data: any[]) => void) => {
-  if (isOfflineMode || !db) {
-      const initialData = getLocalData(collectionName);
-      callback(initialData);
-      
-      const listener = (data: any[]) => callback(data);
-      localListeners[collectionName].push(listener);
-      
-      return () => {
-          localListeners[collectionName] = localListeners[collectionName].filter(l => l !== listener);
-      };
-  }
+    if (isOfflineMode || !db) {
+        const initialData = getLocalData(collectionName);
+        callback(initialData);
 
-  try {
-      const q = query(collection(db, collectionName));
-      const unsubscribe = onSnapshot(q, 
-        (querySnapshot) => {
-          const data: any[] = [];
-          querySnapshot.forEach((doc) => {
-            data.push(doc.data());
-          });
-          callback(data);
-        },
-        (error) => {
-          if (error.code === 'permission-denied') {
-               console.warn(`Firestore: Permission denied for ${collectionName}. Using local data.`);
-               if (!isOfflineMode) {
-                  isOfflineMode = true;
-                  initLocalDataIfNeeded();
-               }
-          } else {
-               console.error(`Firestore Error on ${collectionName}:`, error.code || error.message);
-               if (error.code === 'unavailable') {
+        const listener = (data: any[]) => callback(data);
+        localListeners[collectionName].push(listener);
+
+        return () => {
+            localListeners[collectionName] = localListeners[collectionName].filter(l => l !== listener);
+        };
+    }
+
+    try {
+        const q = query(collection(db, collectionName));
+        const unsubscribe = onSnapshot(q,
+            (querySnapshot) => {
+                const data: any[] = [];
+                querySnapshot.forEach((doc) => {
+                    data.push(doc.data());
+                });
+                callback(data);
+            },
+            (error) => {
+                if (error.code === 'permission-denied') {
+                    console.warn(`Firestore: Permission denied for ${collectionName}. Using local data.`);
                     if (!isOfflineMode) {
                         isOfflineMode = true;
                         initLocalDataIfNeeded();
                     }
-               }
-          }
-          const localData = getLocalData(collectionName);
-          callback(localData);
-          const listener = (data: any[]) => callback(data);
-          localListeners[collectionName].push(listener);
-        }
-      );
+                } else {
+                    console.error(`Firestore Error on ${collectionName}:`, error.code || error.message);
+                    if (error.code === 'unavailable') {
+                        if (!isOfflineMode) {
+                            isOfflineMode = true;
+                            initLocalDataIfNeeded();
+                        }
+                    }
+                }
+                const localData = getLocalData(collectionName);
+                callback(localData);
+                const listener = (data: any[]) => callback(data);
+                localListeners[collectionName].push(listener);
+            }
+        );
 
-      return () => {
-          unsubscribe();
-      };
-  } catch (e) {
-      console.error("Error creating snapshot listener:", e);
-      const localData = getLocalData(collectionName);
-      callback(localData);
-      return () => {};
-  }
+        return () => {
+            unsubscribe();
+        };
+    } catch (e) {
+        console.error("Error creating snapshot listener:", e);
+        const localData = getLocalData(collectionName);
+        callback(localData);
+        return () => { };
+    }
 };
 
 export const registerNewLoanInCloud = async (loan: LoanRecord) => {
-  if (isOfflineMode || !db) {
-      const loans = getLocalData(COLL_LOANS);
-      const equipment = getLocalData(COLL_EQUIPMENT);
-      
-      const eqIndex = equipment.findIndex(e => e.id === loan.equipmentId);
-      if (eqIndex >= 0 && equipment[eqIndex].status === EquipmentStatus.ON_LOAN) {
-           return { success: false, error: "El equipo ya figura como prestado en la base de datos local." };
-      }
+    if (isOfflineMode || !db) {
+        const loans = getLocalData(COLL_LOANS);
+        const equipment = getLocalData(COLL_EQUIPMENT);
 
-      loans.push({ ...loan, loanDate: loan.loanDate instanceof Date ? loan.loanDate.toISOString() : loan.loanDate });
-      if (eqIndex >= 0) equipment[eqIndex].status = EquipmentStatus.ON_LOAN;
+        const eqIndex = equipment.findIndex(e => e.id === loan.equipmentId);
+        if (eqIndex >= 0 && equipment[eqIndex].status === EquipmentStatus.ON_LOAN) {
+            return { success: false, error: "El equipo ya figura como prestado en la base de datos local." };
+        }
 
-      setLocalData(COLL_LOANS, loans);
-      setLocalData(COLL_EQUIPMENT, equipment);
-      return { success: true };
-  }
+        loans.push({ ...loan, loanDate: loan.loanDate instanceof Date ? loan.loanDate.toISOString() : loan.loanDate });
+        if (eqIndex >= 0) equipment[eqIndex].status = EquipmentStatus.ON_LOAN;
 
-  try {
-    await ensureAuth();
-    await runTransaction(db, async (transaction) => {
-      const equipmentRef = doc(db!, COLL_EQUIPMENT, loan.equipmentId);
-      const loanRef = doc(db!, COLL_LOANS, loan.id);
-      
-      const equipmentDoc = await transaction.get(equipmentRef);
-      if (!equipmentDoc.exists()) throw "El equipo no existe en la base de datos.";
-      
-      const currentStatus = equipmentDoc.data().status;
-      if (currentStatus === EquipmentStatus.ON_LOAN) {
-          throw "El equipo ya ha sido prestado a otro usuario hace un momento.";
-      }
+        setLocalData(COLL_LOANS, loans);
+        setLocalData(COLL_EQUIPMENT, equipment);
+        return { success: true };
+    }
 
-      const loanData = {
-        ...loan,
-        loanDate: loan.loanDate instanceof Date ? loan.loanDate.toISOString() : loan.loanDate,
-        returnDate: null
-      };
-      
-      transaction.set(loanRef, loanData);
-      transaction.update(equipmentRef, { status: EquipmentStatus.ON_LOAN });
-    });
-    return { success: true };
-  } catch (e: any) {
-    const msg = e.message || String(e);
-    if (e.code === 'permission-denied') return { success: false, error: "Permisos insuficientes." };
-    console.error("Transaction failed:", msg);
-    return { success: false, error: msg };
-  }
+    try {
+        await ensureAuth();
+        await runTransaction(db, async (transaction) => {
+            const equipmentRef = doc(db!, COLL_EQUIPMENT, loan.equipmentId);
+            const loanRef = doc(db!, COLL_LOANS, loan.id);
+
+            const equipmentDoc = await transaction.get(equipmentRef);
+            if (!equipmentDoc.exists()) throw "El equipo no existe en la base de datos.";
+
+            const currentStatus = equipmentDoc.data().status;
+            if (currentStatus === EquipmentStatus.ON_LOAN) {
+                throw "El equipo ya ha sido prestado a otro usuario hace un momento.";
+            }
+
+            const loanData = {
+                ...loan,
+                loanDate: loan.loanDate instanceof Date ? loan.loanDate.toISOString() : loan.loanDate,
+                returnDate: null
+            };
+
+            transaction.set(loanRef, loanData);
+            transaction.update(equipmentRef, { status: EquipmentStatus.ON_LOAN });
+        });
+        return { success: true };
+    } catch (e: any) {
+        const msg = e.message || String(e);
+        if (e.code === 'permission-denied') return { success: false, error: "Permisos insuficientes." };
+        console.error("Transaction failed:", msg);
+        return { success: false, error: msg };
+    }
 };
 
 export const registerReturnInCloud = async (
-  loanId: string, 
-  equipmentId: string, 
-  returnData: { concept: string, status: string, photos: string[], analysis: string }
+    loanId: string,
+    equipmentId: string,
+    returnData: { concept: string, status: string, photos: string[], analysis: string }
 ) => {
-  if (isOfflineMode || !db) {
-      const loans = getLocalData(COLL_LOANS);
-      const equipment = getLocalData(COLL_EQUIPMENT);
-      
-      const loanIndex = loans.findIndex(l => l.id === loanId);
-      const eqIndex = equipment.findIndex(e => e.id === equipmentId);
+    if (isOfflineMode || !db) {
+        const loans = getLocalData(COLL_LOANS);
+        const equipment = getLocalData(COLL_EQUIPMENT);
 
-      if (loanIndex >= 0) {
-          loans[loanIndex] = {
-              ...loans[loanIndex],
-              returnDate: new Date().toISOString(),
-              returnConcept: returnData.concept,
-              returnStatus: returnData.status,
-              returnPhotos: returnData.photos,
-              returnConditionAnalysis: returnData.analysis
-          };
-          setLocalData(COLL_LOANS, loans);
-      }
-      
-      if (eqIndex >= 0) {
-          equipment[eqIndex].status = EquipmentStatus.AVAILABLE;
-          setLocalData(COLL_EQUIPMENT, equipment);
-      }
-      return { success: true };
-  }
+        const loanIndex = loans.findIndex(l => l.id === loanId);
+        const eqIndex = equipment.findIndex(e => e.id === equipmentId);
 
-  try {
-    await ensureAuth();
-    await runTransaction(db, async (transaction) => {
-      const equipmentRef = doc(db!, COLL_EQUIPMENT, equipmentId);
-      const loanRef = doc(db!, COLL_LOANS, loanId);
+        if (loanIndex >= 0) {
+            loans[loanIndex] = {
+                ...loans[loanIndex],
+                returnDate: new Date().toISOString(),
+                returnConcept: returnData.concept,
+                returnStatus: returnData.status,
+                returnPhotos: returnData.photos,
+                returnConditionAnalysis: returnData.analysis
+            };
+            setLocalData(COLL_LOANS, loans);
+        }
 
-      transaction.update(loanRef, {
-        returnDate: new Date().toISOString(),
-        returnConcept: returnData.concept,
-        returnStatus: returnData.status,
-        returnPhotos: returnData.photos,
-        returnConditionAnalysis: returnData.analysis
-      });
-      transaction.update(equipmentRef, { status: EquipmentStatus.AVAILABLE });
-    });
-    return { success: true };
-  } catch (e: any) {
-    const msg = e.message || String(e);
-    if (e.code === 'permission-denied') return { success: false, error: "Permisos insuficientes." };
-    console.error("Return transaction failed:", msg);
-    return { success: false, error: msg };
-  }
+        if (eqIndex >= 0) {
+            equipment[eqIndex].status = EquipmentStatus.AVAILABLE;
+            setLocalData(COLL_EQUIPMENT, equipment);
+        }
+        return { success: true };
+    }
+
+    try {
+        await ensureAuth();
+        await runTransaction(db, async (transaction) => {
+            const equipmentRef = doc(db!, COLL_EQUIPMENT, equipmentId);
+            const loanRef = doc(db!, COLL_LOANS, loanId);
+
+            transaction.update(loanRef, {
+                returnDate: new Date().toISOString(),
+                returnConcept: returnData.concept,
+                returnStatus: returnData.status,
+                returnPhotos: returnData.photos,
+                returnConditionAnalysis: returnData.analysis
+            });
+            transaction.update(equipmentRef, { status: EquipmentStatus.AVAILABLE });
+        });
+        return { success: true };
+    } catch (e: any) {
+        const msg = e.message || String(e);
+        if (e.code === 'permission-denied') return { success: false, error: "Permisos insuficientes." };
+        console.error("Return transaction failed:", msg);
+        return { success: false, error: msg };
+    }
 };
 
 export const addUserToCloud = async (user: User) => {
@@ -298,7 +366,7 @@ export const addUserToCloud = async (user: User) => {
         const users = getLocalData(COLL_USERS);
         const index = users.findIndex(u => u.id === user.id);
         if (index >= 0) {
-             users[index] = user; // Actualizar si existe
+            users[index] = user; // Actualizar si existe
         } else {
             users.push(user);
         }
@@ -314,7 +382,7 @@ export const addUserToCloud = async (user: User) => {
 };
 
 export const updateUserInCloud = async (user: User) => {
-     return addUserToCloud(user); // Reutilizamos lógica de setDoc/merge implícito o reemplazo
+    return addUserToCloud(user); // Reutilizamos lógica de setDoc/merge implícito o reemplazo
 };
 
 export const updateUserCredentials = async (userId: string, email: string, newPasswordHash: string) => {
@@ -355,7 +423,7 @@ export const addEquipmentToCloud = async (item: Equipment) => {
         await ensureAuth();
         await setDoc(doc(db, COLL_EQUIPMENT, item.id), item);
     } catch (e: any) {
-         console.error("Add equipment error:", e.message);
+        console.error("Add equipment error:", e.message);
     }
 };
 
@@ -444,9 +512,9 @@ export const seedCloudDatabase = async (onProgress?: (message: string, percentag
         const localEquipmentRaw = getLocalData(COLL_EQUIPMENT);
         const mergedEquipment = [...DEFAULT_EQUIPMENT];
         localEquipmentRaw.forEach(localEq => {
-             if (!mergedEquipment.find(me => me.id === localEq.id)) {
-                 mergedEquipment.push(localEq);
-             }
+            if (!mergedEquipment.find(me => me.id === localEq.id)) {
+                mergedEquipment.push(localEq);
+            }
         });
 
         mergedEquipment.forEach(eq => {
@@ -474,7 +542,7 @@ export const seedCloudDatabase = async (onProgress?: (message: string, percentag
                 u.passwordHash = await hashPassword(u.id);
                 u.forcePasswordChange = true;
             }
-             allOperations.push({
+            allOperations.push({
                 type: 'set',
                 ref: doc(db!, COLL_USERS, u.id),
                 data: u
@@ -484,7 +552,7 @@ export const seedCloudDatabase = async (onProgress?: (message: string, percentag
         const totalDocs = allOperations.length;
         const BATCH_SIZE = 400;
         const chunks = [];
-        
+
         for (let i = 0; i < totalDocs; i += BATCH_SIZE) {
             chunks.push(allOperations.slice(i, i + BATCH_SIZE));
         }

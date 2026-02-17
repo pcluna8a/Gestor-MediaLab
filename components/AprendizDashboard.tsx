@@ -366,7 +366,7 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
                     value={selectedInstructor}
                     onChange={e => setSelectedInstructor(e.target.value)}
                     required
-                    className="w-full p-3 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-sena-green outline-none transition-all"
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg shadow-sm focus:ring-2 focus:ring-sena-green outline-none transition-all"
                 >
                     <option value="" disabled>-- Selecciona quién autoriza el préstamo --</option>
                     {instructors.map(instructor => (
@@ -388,7 +388,7 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
                                 value={inventoryCode}
                                 onChange={(e) => setInventoryCode(e.target.value.replace(/[^0-9]/g, ''))}
                                 placeholder="Ej: 10100113..."
-                                className="flex-grow p-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-sena-green outline-none font-mono text-lg tracking-wider"
+                                className="flex-grow p-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg shadow-sm focus:ring-2 focus:ring-sena-green outline-none font-mono text-lg tracking-wider"
                             />
                          </div>
                          {/* Scan Button Area */}
