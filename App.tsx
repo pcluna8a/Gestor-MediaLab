@@ -146,19 +146,7 @@ const MainApp: React.FC = () => {
           </div>
 
           {/* Status Bar */}
-          <div className="hidden md:flex items-center gap-4 px-4 py-1 rounded-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-              <span className="text-xs font-bold text-gray-600 dark:text-gray-300">
-                {isOnline ? 'CONECTADO A LA NUBE' : 'MODO LOCAL (OFFLINE)'}
-              </span>
-            </div>
-            {isOnline && lastSync && (
-              <span className="text-[10px] text-gray-400 border-l pl-3 border-gray-300 dark:border-gray-500">
-                Sincronizado: {lastSync.toLocaleTimeString()}
-              </span>
-            )}
-          </div>
+
 
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
@@ -173,8 +161,7 @@ const MainApp: React.FC = () => {
             </button>
           </div>
         </div>
-        {/* Mobile Status Bar */}
-        <div className={`md:hidden h-1 w-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+
       </header>
 
       {/* Main Content */}

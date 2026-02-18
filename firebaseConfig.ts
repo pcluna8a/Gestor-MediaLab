@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 
@@ -21,6 +21,16 @@ try {
   // Inicializar Firebase de manera segura
   app = initializeApp(firebaseConfig);
   dbInstance = getFirestore(app);
+
+  // Habilitar persistencia sin bloqueo (best-effort)
+  enableIndexedDbPersistence(dbInstance).catch((err: any) => {
+    if (err.code == 'failed-precondition') {
+      console.warn('Persistencia fallida: Múltiples pestañas abiertas.');
+    } else if (err.code == 'unimplemented') {
+      console.warn('El navegador no soporta persistencia.');
+    }
+  });
+
   authInstance = getAuth(app);
   functionsInstance = getFunctions(app);
 } catch (error) {
