@@ -7,6 +7,7 @@ import { Toast, useToast } from './components/Toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider, useData } from './contexts/DataContext';
 import { LoginScreen } from './components/LoginScreen';
+import GlassCard from './components/GlassCard';
 
 const getGreetingName = (fullName: string): string => {
   if (!fullName) return 'Usuario';
@@ -35,7 +36,6 @@ const MainApp: React.FC = () => {
     loans,
     users,
     isOnline,
-    lastSync,
     addEquipment,
     updateEquipment,
     deleteEquipment,
@@ -46,25 +46,14 @@ const MainApp: React.FC = () => {
   } = useData();
 
   const { toast, showToast, closeToast } = useToast();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Dark mode is now default/forced by design "Futurismo Institucional", but we keep state for toggle if user really wants light mode (though design specs say Dark/Glass).
+  // Actually specs say "Environment digital oscuro (Dark Mode)". Let's default to true and maybe hide toggle or keep it.
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Dark Mode Logic
+  // Force dark mode class for Tailwind
   useEffect(() => {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setIsDarkMode(true);
-    }
+    document.documentElement.classList.add('dark');
   }, []);
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
-  // Adapters for Toast (Context methods return promises with {success, error})
-  // We wrap them to show toasts here.
 
   const handleNewLoan = async (loan: LoanRecord) => {
     const result = await registerLoan(loan);
@@ -89,7 +78,7 @@ const MainApp: React.FC = () => {
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
-    await addUser(updatedUser); // Reuse add for update/merge logic
+    await addUser(updatedUser);
     showToast("Usuario actualizado", "success");
   };
 
@@ -131,69 +120,72 @@ const MainApp: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-sena-dark transition-colors duration-300">
+    <div className="min-h-screen font-sans text-gray-100 transition-colors duration-300 relative overflow-hidden">
+      {/* Background Gradients for "Futurismo" effect */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-sena-green/20 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+
       {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
 
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logoSena.png" onError={(e) => e.currentTarget.src = "https://www.sena.edu.co/Style%20Library/alayout/images/logoSena.png"} alt="SENA" className="h-10 w-10 dark:brightness-0 dark:invert" />
+      {/* Glass Header */}
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-[#00324D]/60 border-b border-white/10 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-sena-green/50 rounded-full blur opacity-0 group-hover:opacity-100 transition duration-500"></div>
+              <img src="/logoSena.png" onError={(e) => e.currentTarget.src = "https://www.sena.edu.co/Style%20Library/alayout/images/logoSena.png"} alt="SENA" className="relative h-12 w-12 drop-shadow-lg" />
+            </div>
             <div>
-              <h1 className="text-xl font-bold text-sena-green">MediaLab</h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Gestor de Préstamos - CIES</p>
+              <h1 className="text-2xl font-bold text-white tracking-tight">Media<span className="text-sena-green">Lab</span></h1>
+              <p className="text-xs text-gray-300 hidden sm:block font-light tracking-wider">GESTOR DE PRÉSTAMOS - CIES</p>
             </div>
           </div>
 
-          {/* Status Bar */}
-
-
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">{getGreetingName(currentUser.name)}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.role.replace(/_/g, ' ')}</p>
+              <p className="text-sm font-semibold text-white">{getGreetingName(currentUser.name)}</p>
+              <p className="text-[10px] uppercase tracking-widest text-sena-green font-bold">{currentUser.role.replace(/_/g, ' ')}</p>
             </div>
-            <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors">
-              {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
-            </button>
-            <button onClick={logout} className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors" title="Cerrar Sesión">
-              <LogoutIcon className="w-5 h-5" />
+
+            <button onClick={logout} className="p-2 rounded-full hover:bg-white/10 text-red-400 hover:text-red-300 transition-all border border-transparent hover:border-red-500/30" title="Cerrar Sesión">
+              <LogoutIcon className="w-6 h-6" />
             </button>
           </div>
         </div>
-
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentUser.role === Role.INSTRUCTOR_MEDIALAB ? (
-          <InstructorDashboard
-            currentUser={currentUser}
-            loans={loans}
-            equipment={equipment}
-            users={users}
-            onNewLoan={handleNewLoan}
-            onReturn={handleReturn}
-            onUpdateInventory={() => { }} // Legacy?
-            onAddNewUser={handleAddNewUser}
-            onUpdateUser={handleUpdateUser}
-            onAddNewEquipment={handleAddNewEquipment}
-            onUpdateEquipmentImage={handleUpdateEquipmentImage}
-            onEditEquipment={handleEditEquipment}
-            onDeleteEquipment={handleDeleteEquipment}
-            checkpointTimestamp={null}
-            onCreateCheckpoint={() => { }}
-            isOnline={isOnline}
-          />
-        ) : (
-          <UserDashboard
-            currentUser={currentUser}
-            loans={loans}
-            equipment={equipment}
-            users={users}
-            onNewLoan={handleNewLoan}
-          />
-        )}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+        <div className="animate-fade-in">
+          {currentUser.role === Role.INSTRUCTOR_MEDIALAB ? (
+            <InstructorDashboard
+              currentUser={currentUser}
+              loans={loans}
+              equipment={equipment}
+              users={users}
+              onNewLoan={handleNewLoan}
+              onReturn={handleReturn}
+              onUpdateInventory={() => { }}
+              onAddNewUser={handleAddNewUser}
+              onUpdateUser={handleUpdateUser}
+              onAddNewEquipment={handleAddNewEquipment}
+              onUpdateEquipmentImage={handleUpdateEquipmentImage}
+              onEditEquipment={handleEditEquipment}
+              onDeleteEquipment={handleDeleteEquipment}
+              checkpointTimestamp={null}
+              onCreateCheckpoint={() => { }}
+              isOnline={isOnline}
+            />
+          ) : (
+            <UserDashboard
+              currentUser={currentUser}
+              loans={loans}
+              equipment={equipment}
+              users={users}
+              onNewLoan={handleNewLoan}
+            />
+          )}
+        </div>
       </main>
     </div>
   );

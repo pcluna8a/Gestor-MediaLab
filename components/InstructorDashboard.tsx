@@ -2,6 +2,7 @@
 import React, { useState, Suspense } from 'react';
 import { User, LoanRecord, Equipment } from '../types';
 import Spinner from './Spinner';
+import GlassCard from './GlassCard';
 import { HomeIcon, PlusCircleIcon, ClipboardListIcon, UserGroupIcon, WrenchIcon, DocumentReportIcon } from './Icons';
 
 // Lazy Load Sub-components
@@ -36,40 +37,45 @@ interface DashboardProps {
 const TabButton: React.FC<{ icon: React.ReactNode, text: string, isActive: boolean, onClick: () => void }> = ({ icon, text, isActive, onClick }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-2 py-4 px-3 border-b-2 font-medium text-sm transition-colors ${isActive
-                ? 'border-sena-green text-sena-green'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
+        className={`flex items-center gap-3 py-3 px-5 rounded-full font-medium text-sm transition-all duration-300 relative overflow-hidden group ${isActive
+            ? 'bg-sena-green text-white shadow-[0_0_15px_rgba(57,169,0,0.6)] border border-sena-green'
+            : 'bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10'
             }`}
     >
-        {icon} <span className="hidden sm:inline">{text}</span>
+        <span className={`relative z-10 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>{icon}</span>
+        <span className="relative z-10 hidden md:inline">{text}</span>
+
+        {/* Neon Glow Hover Effect */}
+        <span className="absolute inset-0 rounded-full bg-sena-green/20 opacity-0 group-hover:opacity-100 blur-md transition-opacity duration-300"></span>
     </button>
 );
 
 const InstructorDashboard: React.FC<DashboardProps> = (props) => {
     const [activeTab, setActiveTab] = useState<Tab>('home');
 
-    // Fix for async onAddNewUser prop mismatch if necessary (handled by just passing it as is, types adjusted in interface)
-
     return (
-        <div className="w-full">
-            <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-                <nav className="-mb-px flex space-x-6 overflow-x-auto whitespace-nowrap" aria-label="Tabs">
-                    <TabButton icon={<HomeIcon className="w-5 h-5" />} text="Inicio" isActive={activeTab === 'home'} onClick={() => setActiveTab('home')} />
-                    <TabButton icon={<PlusCircleIcon className="w-5 h-5" />} text="Nuevo Préstamo" isActive={activeTab === 'newLoan'} onClick={() => setActiveTab('newLoan')} />
-                    <TabButton icon={<ClipboardListIcon className="w-5 h-5" />} text="Préstamos Activos" isActive={activeTab === 'activeLoans'} onClick={() => setActiveTab('activeLoans')} />
-                    <TabButton icon={<UserGroupIcon className="w-5 h-5" />} text="Usuarios" isActive={activeTab === 'manageUsers'} onClick={() => setActiveTab('manageUsers')} />
-                    <TabButton icon={<WrenchIcon className="w-5 h-5" />} text="Inventario" isActive={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} />
-                    <TabButton icon={<DocumentReportIcon className="w-5 h-5" />} text="Reportes" isActive={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
-                </nav>
+        <div className="w-full space-y-6">
+            {/* Navigation Tabs - Floating Glass Bar */}
+            <div className="flex justify-center">
+                <div className="inline-flex p-1.5 bg-[#002b42]/80 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl overflow-x-auto max-w-full">
+                    <nav className="flex space-x-2" aria-label="Tabs">
+                        <TabButton icon={<HomeIcon className="w-5 h-5" />} text="Inicio" isActive={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+                        <TabButton icon={<PlusCircleIcon className="w-5 h-5" />} text="Préstamo" isActive={activeTab === 'newLoan'} onClick={() => setActiveTab('newLoan')} />
+                        <TabButton icon={<ClipboardListIcon className="w-5 h-5" />} text="Activos" isActive={activeTab === 'activeLoans'} onClick={() => setActiveTab('activeLoans')} />
+                        <TabButton icon={<UserGroupIcon className="w-5 h-5" />} text="Usuarios" isActive={activeTab === 'manageUsers'} onClick={() => setActiveTab('manageUsers')} />
+                        <TabButton icon={<WrenchIcon className="w-5 h-5" />} text="Inventario" isActive={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} />
+                        <TabButton icon={<DocumentReportIcon className="w-5 h-5" />} text="Reportes" isActive={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
+                    </nav>
+                </div>
             </div>
 
-            <div className="min-h-[400px]">
+            {/* Main Content Area */}
+            <GlassCard className="min-h-[500px] p-6 animate-slide-up relative z-0">
                 <Suspense fallback={<div className="flex justify-center items-center h-64"><Spinner size="12" color="sena-green" /></div>}>
                     {activeTab === 'home' && <HomeView loans={props.loans} equipment={props.equipment} />}
                     {activeTab === 'newLoan' && <NewLoanView users={props.users} equipment={props.equipment} onNewLoan={props.onNewLoan} currentUser={props.currentUser} />}
                     {activeTab === 'activeLoans' && <ActiveLoansView loans={props.loans} equipment={props.equipment} users={props.users} onReturn={props.onReturn} />}
                     {activeTab === 'manageUsers' && (
-                        // Cast prop to handle mismatch if needed, but updated interface above.
                         <ManageUsersView
                             users={props.users}
                             onAddNewUser={props.onAddNewUser as any}
@@ -89,7 +95,7 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                     )}
                     {activeTab === 'reports' && <ReportsView loans={props.loans} />}
                 </Suspense>
-            </div>
+            </GlassCard>
         </div>
     );
 };
