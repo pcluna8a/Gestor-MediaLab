@@ -1,51 +1,52 @@
-
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gestor de Préstamos MediaLab</title>
-    <!-- Google Fonts: Work Sans -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Work Sans', 'sans-serif'],
-            },
-            colors: {
-              'sena-green': '#39A900', // Verde corporativo oficial SENA
-              'sena-blue': '#00324D',  // Azul SENA
-              'sena-dark': '#111827',  // Fondo oscuro profundo (Gray 900)
-            },
-            boxShadow: {
-              'neon': '0 0 10px rgba(57, 169, 0, 0.5)',
-            },
-            animation: {
-              'fade-in': 'fadeIn 0.5s ease-out forwards',
-              'slide-up': 'slideUp 0.5s ease-out forwards',
-            },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              slideUp: {
-                '0%': { opacity: '0', transform: 'translateY(20px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              },
-            }
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestor de Préstamos MediaLab</title>
+  <!-- Google Fonts: Work Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Work Sans', 'sans-serif'],
           },
+          colors: {
+            'sena-green': '#39A900', // Verde corporativo oficial SENA
+            'sena-blue': '#00324D',  // Azul SENA
+            'sena-dark': '#111827',  // Fondo oscuro profundo (Gray 900)
+          },
+          boxShadow: {
+            'neon': '0 0 10px rgba(57, 169, 0, 0.5)',
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.5s ease-out forwards',
+            'slide-up': 'slideUp 0.5s ease-out forwards',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            slideUp: {
+              '0%': { opacity: '0', transform: 'translateY(20px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            },
+          }
         },
-      }
-    </script>
+      },
+    }
+  </script>
   <script type="importmap">
 {
   "imports": {
@@ -61,8 +62,18 @@
 }
 </script>
 </head>
-  <body class="bg-[#00324D] text-white min-h-screen">
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+
+<body class="bg-[#00324D] text-white min-h-screen">
+  <div id="root"></div>
+  <script src="https://www.gstatic.com/firebasejs/8.0/firebase.js"></script>
+  <script>
+    var config = {
+      apiKey: "AIzaSyDNbMkUW0VZibUhpZChtAnCWD1qMZ3Hllw",
+      authDomain: "gestor-medialab-sena.firebaseapp.com",
+    };
+    firebase.initializeApp(config);
+  </script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
 </html>
