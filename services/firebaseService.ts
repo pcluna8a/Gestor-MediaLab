@@ -115,15 +115,30 @@ export const loginStudent = async (id: string, category: string, name: string = 
         if (!userSnap.empty) {
             // Usuario ya existe
             userData = userSnap.docs[0].data() as User;
-            // Actualizar categoría si cambió (opcional)
+
+            // Prepare updates
+            const updates: any = {};
+
+            // Actualizar categoría si cambió
             if (userData.category !== category) {
-                await updateDoc(userSnap.docs[0].ref, { category });
+                updates.category = category;
                 userData.category = category as any;
+            }
+
+            // Actualizar UID si falta (para recuperación de sesión)
+            if (!userData.uid && auth.currentUser?.uid) {
+                updates.uid = auth.currentUser.uid;
+                userData.uid = auth.currentUser.uid;
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await updateDoc(userSnap.docs[0].ref, updates);
             }
         } else {
             // Crear nuevo usuario estudiante
             userData = {
                 id: id,
+                uid: auth.currentUser?.uid, // Store the Auth UID for session recovery
                 name: name,
                 role: Role.USUARIO_MEDIALAB,
                 category: category as any

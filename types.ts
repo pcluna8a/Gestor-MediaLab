@@ -16,6 +16,7 @@ export interface User {
   role: Role;
   category?: UserCategory;
   // Security Fields
+  uid?: string; // Firebase Auth UID
   email?: string;
   passwordHash?: string; // Stored as SHA-256 hash
   forcePasswordChange?: boolean; // True if user must change password on next login
@@ -27,7 +28,7 @@ export enum EquipmentStatus {
 }
 
 export interface Equipment {
-  id:string;
+  id: string;
   name: string;
   type: string;
   status: EquipmentStatus;
@@ -51,22 +52,22 @@ export interface LoanRecord {
 }
 
 export interface MaintenanceSuggestion {
-    equipmentId: string;
-    equipmentName: string;
-    suggestion: string;
+  equipmentId: string;
+  equipmentName: string;
+  suggestion: string;
 }
 
 export const createNewLoan = (data: Partial<LoanRecord>): LoanRecord => {
-    return {
-        id: data.id || `L${Date.now()}`,
-        equipmentId: data.equipmentId || '',
-        borrowerId: data.borrowerId || '',
-        instructorId: data.instructorId || '',
-        loanDate: data.loanDate || new Date(),
-        returnDate: null,
-        photos: data.photos || [],
-        conditionAnalysis: data.conditionAnalysis || '',
-        placa: data.placa,
-        returnStatus: '',
-    };
+  return {
+    id: data.id || `L${Date.now()}`,
+    equipmentId: data.equipmentId || '',
+    borrowerId: data.borrowerId || '',
+    instructorId: data.instructorId || '',
+    loanDate: data.loanDate || new Date(),
+    returnDate: null,
+    photos: data.photos || [],
+    conditionAnalysis: data.conditionAnalysis || '',
+    placa: data.placa,
+    returnStatus: '',
+  };
 };
