@@ -9,7 +9,7 @@ interface AuthContextType {
     currentUser: User | null;
     isLoading: boolean;
     loginInstructor: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-    loginStudent: (id: string, category: UserCategory) => Promise<{ success: boolean; error?: string }>;
+    loginStudent: (email: string, password: string, category: UserCategory) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
     isAdmin: boolean;
     isInstructor: boolean;
@@ -83,8 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: res.error };
     };
 
-    const handleLoginStudent = async (id: string, category: UserCategory) => {
-        const res = await loginStudent(id, category);
+    const handleLoginStudent = async (email: string, password: string, category: UserCategory) => {
+        const res = await loginStudent(email, password, category);
         if (res.success && res.user) {
             // Check if we need to update the currentUser state manually
             // With the new logic, onAuthStateChanged might handle it, but setting it here is faster/safer response

@@ -37,13 +37,13 @@ export const LoginScreen: React.FC = () => {
         e.preventDefault();
         setError('');
         setLocalLoading(true);
-        if (!studentId || !studentCategory) {
+        if (!email || !password || !studentCategory) {
             setError("Por favor completa los campos requeridos");
             setLocalLoading(false);
             return;
         }
 
-        const result = await loginStudent(studentId, studentCategory);
+        const result = await loginStudent(email, password, studentCategory);
         if (!result.success) {
             setError(result.error || "Error al ingresar");
         }
@@ -60,15 +60,23 @@ export const LoginScreen: React.FC = () => {
                 <p className="text-center text-sena-gray dark:text-gray-300 mb-6">Sistema Integral de Préstamos</p>
 
                 {/* Tabs */}
-                <div className="flex mb-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex gap-4 mb-6">
                     <button
-                        className={`flex-1 py-2 text-center font-medium transition-colors ${activeTab === 'student' ? 'text-sena-green border-b-2 border-sena-green' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                        className={`flex-1 py-3 text-center font-semibold rounded-xl transition-all duration-300 backdrop-blur-md border ${
+                            activeTab === 'student' 
+                                ? 'bg-sena-green/20 border-sena-green/50 text-sena-green shadow-[0_0_15px_rgba(57,169,0,0.3)]' 
+                                : 'bg-white/5 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700/50 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:text-gray-400'
+                        }`}
                         onClick={() => { setActiveTab('student'); setError(''); }}
                     >
-                        Aprendiz / Usuario
+                        Usuario
                     </button>
                     <button
-                        className={`flex-1 py-2 text-center font-medium transition-colors ${activeTab === 'instructor' ? 'text-sena-green border-b-2 border-sena-green' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                        className={`flex-1 py-3 text-center font-semibold rounded-xl transition-all duration-300 backdrop-blur-md border ${
+                            activeTab === 'instructor' 
+                                ? 'bg-sena-green/20 border-sena-green/50 text-sena-green shadow-[0_0_15px_rgba(57,169,0,0.3)]' 
+                                : 'bg-white/5 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700/50 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:text-gray-400'
+                        }`}
                         onClick={() => { setActiveTab('instructor'); setError(''); }}
                     >
                         Instructor / Admin
@@ -122,13 +130,23 @@ export const LoginScreen: React.FC = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Número de Documento</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Correo Institucional</label>
                             <input
-                                type="text"
-                                value={studentId}
-                                onChange={e => setStudentId(e.target.value.replace(/[^0-9]/g, ''))}
+                                type="email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
                                 className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sena-dark dark:text-white focus:ring-2 focus:ring-sena-green transition-colors"
-                                placeholder="1234567890"
+                                placeholder="usuario@sena.edu.co"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contraseña</label>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sena-dark dark:text-white focus:ring-2 focus:ring-sena-green transition-colors"
+                                placeholder="••••••••"
                             />
                         </div>
                         {error && <p className="text-red-500 text-sm py-2">{error}</p>}

@@ -99,16 +99,31 @@ export const loginInstructor = async (email: string, password: string) => {
     }
 };
 
-// Login para Aprendices (Anónimo + Registro en Firestore si es nuevo)
-export const loginStudent = async (id: string, category: string, name: string = 'Usuario') => {
+// Login para Aprendices/Usuarios (Email/Password + Registro en Firestore si es nuevo)
+export const loginStudent = async (email: string, password: string, category: string, name: string = 'Usuario') => {
     if (!auth || !db) return { success: false, error: "Servicios no inicializados" };
     try {
-        // 1. Autenticación Anónima para tener sesión segura
-        await signInAnonymously(auth);
+        // 1. Autenticación con Email y Password
+        let userCredential;
+        try {
+            userCredential = await signInWithEmailAndPassword(auth, email, password);
+        } catch (error: any) {
+            // Si el login falla asumiendo que el usuario no existe, intentamos crearlo
+            try {
+                userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            } catch (createError: any) {
+                if (createError.code === 'auth/email-already-in-use') {
+                    return { success: false, error: "Contraseña incorrecta." };
+                }
+                return { success: false, error: `Error de autenticación: ${createError.message}` };
+            }
+        }
+
+        const id = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
 
         // 2. Buscar o Crear usuario en Firestore
         const userRef = doc(db, COLL_USERS, id);
-        const userSnap = await getDocs(query(collection(db, COLL_USERS), where('id', '==', id), limit(1))); // Buscamos por campo ID interno, no UID de Auth
+        const userSnap = await getDocs(query(collection(db, COLL_USERS), where('email', '==', email), limit(1)));
 
         let userData: User;
 
@@ -131,6 +146,12 @@ export const loginStudent = async (id: string, category: string, name: string = 
                 userData.uid = auth.currentUser.uid;
             }
 
+            // Ensure email is stored just in case
+            if (!userData.email) {
+                updates.email = email;
+                userData.email = email;
+            }
+
             if (Object.keys(updates).length > 0) {
                 await updateDoc(userSnap.docs[0].ref, updates);
             }
@@ -139,6 +160,7 @@ export const loginStudent = async (id: string, category: string, name: string = 
             userData = {
                 id: id,
                 uid: auth.currentUser?.uid, // Store the Auth UID for session recovery
+                email: email,
                 name: name,
                 role: Role.USUARIO_MEDIALAB,
                 category: category as any
