@@ -7,9 +7,10 @@ import Spinner from '../Spinner';
 interface HomeViewProps {
     loans: LoanRecord[];
     equipment: Equipment[];
+    onTabChange?: (tab: any) => void;
 }
 
-const HomeView: React.FC<HomeViewProps> = ({ loans, equipment }) => {
+const HomeView: React.FC<HomeViewProps> = ({ loans, equipment, onTabChange }) => {
     const [suggestions, setSuggestions] = useState<MaintenanceSuggestion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -60,7 +61,10 @@ const HomeView: React.FC<HomeViewProps> = ({ loans, equipment }) => {
         <div className="space-y-6 animate-fade-in">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-blue-500">
+                <div
+                    onClick={() => onTabChange?.('inventory')}
+                    className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-blue-500 cursor-pointer hover:scale-[1.02] hover:shadow-lg transition-all active:scale-[0.98]"
+                >
                     <div className="p-3 bg-blue-100 rounded-full text-blue-600">
                         <CollectionIcon className="w-8 h-8" />
                     </div>
@@ -69,7 +73,10 @@ const HomeView: React.FC<HomeViewProps> = ({ loans, equipment }) => {
                         <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.total}</p>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-yellow-500">
+                <div
+                    onClick={() => onTabChange?.('activeLoans')}
+                    className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-yellow-500 cursor-pointer hover:scale-[1.02] hover:shadow-lg transition-all active:scale-[0.98]"
+                >
                     <div className="p-3 bg-yellow-100 rounded-full text-yellow-600">
                         <ClipboardListIcon className="w-8 h-8" />
                     </div>
@@ -78,7 +85,10 @@ const HomeView: React.FC<HomeViewProps> = ({ loans, equipment }) => {
                         <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.onLoan}</p>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-green-500">
+                <div
+                    onClick={() => onTabChange?.('inventory')}
+                    className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-green-500 cursor-pointer hover:scale-[1.02] hover:shadow-lg transition-all active:scale-[0.98]"
+                >
                     <div className="p-3 bg-green-100 rounded-full text-green-600">
                         <SparklesIcon className="w-8 h-8" />
                     </div>

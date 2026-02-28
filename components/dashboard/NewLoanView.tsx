@@ -13,11 +13,22 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
     const [selectedUser, setSelectedUser] = useState('');
     const [selectedEquipment, setSelectedEquipment] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [equipmentSearchTerm, setEquipmentSearchTerm] = useState('');
 
     const [selectedCategory, setSelectedCategory] = useState('');
 
-    const availableEquipment = equipment.filter(e => e.status === EquipmentStatus.AVAILABLE);
-
+    const availableEquipment = equipment
+        .filter(e => e.status === EquipmentStatus.AVAILABLE)
+        .filter(e => {
+            if (!equipmentSearchTerm) return true;
+            const term = equipmentSearchTerm.toLowerCase();
+            return (
+                e.name.toLowerCase().includes(term) ||
+                e.id.toLowerCase().includes(term) ||
+                e.description?.toLowerCase().includes(term)
+            );
+        });
+    // ... (omitting eligibleUsers for brevity if possible, but replace_file_content needs exact match)
     // Filter users by category and search term
     const eligibleUsers = users
         .filter(u => {
@@ -46,6 +57,7 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
             setSelectedUser('');
             setSelectedEquipment('');
             setSearchTerm('');
+            setEquipmentSearchTerm('');
         }
     };
 
@@ -110,17 +122,37 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 mt-4 uppercase tracking-wide">Equipo Disponible</label>
+                    <div className="relative mb-2">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <SearchIcon className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Buscar por Código, Nombre o Descripción..."
+                            value={equipmentSearchTerm}
+                            onChange={(e) => setEquipmentSearchTerm(e.target.value)}
+                            className="w-full pl-10 p-2 bg-gray-50 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-sena-green focus:border-transparent"
+                        />
+                    </div>
                     <select
                         value={selectedEquipment}
                         onChange={(e) => setSelectedEquipment(e.target.value)}
                         className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
                         required
+                        size={5}
                     >
-                        <option value="">Seleccionar Equipo</option>
+                        {availableEquipment.length === 0 ? (
+                            <option value="" disabled>No se encontraron equipos</option>
+                        ) : (
+                            !selectedEquipment && <option value="">Seleccionar Equipo...</option>
+                        )}
                         {availableEquipment.map(e => (
-                            <option key={e.id} value={e.id}>{e.id}</option>
+                            <option key={e.id} value={e.id}>{e.name || e.id} - {e.id}</option>
                         ))}
                     </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                        {availableEquipment.length} equipo(s) disponible(s).
+                    </p>
 
                     {/* Equipment Preview Card */}
                     {selectedEquipment && (

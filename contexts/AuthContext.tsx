@@ -3,13 +3,15 @@ import { User, Role, UserCategory } from '../types';
 import { auth, db } from '../firebaseConfig';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, query, where, getDocs, limit, doc, getDoc } from 'firebase/firestore';
-import { loginInstructor, loginStudent, logoutUser } from '../services/firebaseService';
+import { loginInstructor, loginStudent, logoutUser, loginWithGoogle as loginWithGoogleService, sendPasswordReset as sendResetService } from '../services/firebaseService';
 
 interface AuthContextType {
     currentUser: User | null;
     isLoading: boolean;
     loginInstructor: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
     loginStudent: (email: string, password: string, category: UserCategory) => Promise<{ success: boolean; error?: string }>;
+    loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+    sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
     isAdmin: boolean;
     isInstructor: boolean;
@@ -95,6 +97,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: res.error };
     };
 
+    const handleLoginGoogle = async () => {
+        const res = await loginWithGoogleService();
+        if (res.success && res.user) {
+            const userProfile = await fetchUserProfile(res.user as FirebaseUser);
+            if (userProfile) {
+                setCurrentUser(userProfile);
+                return { success: true };
+            } else {
+                // If Google user has no profile, create a default one
+                const newUser: User = {
+                    id: (res.user as FirebaseUser).email?.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') || (res.user as FirebaseUser).uid,
+                    uid: (res.user as FirebaseUser).uid,
+                    email: (res.user as FirebaseUser).email || '',
+                    name: (res.user as FirebaseUser).displayName || 'Usuario Google',
+                    role: Role.USUARIO_MEDIALAB,
+                    category: UserCategory.APRENDIZ // Default
+                };
+                // We should ideally call addUserToCloud here, but for simplicity we rely on the next login or manual registration
+                // Let's actually save it to be safe
+                const { addUserToCloud } = await import('../services/firebaseService');
+                await addUserToCloud(newUser);
+                setCurrentUser(newUser);
+                return { success: true };
+            }
+        }
+        return { success: false, error: res.error };
+    };
+
+    const handleResetPassword = async (email: string) => {
+        return await sendResetService(email);
+    };
+
     const logout = async () => {
         await logoutUser();
         setCurrentUser(null);
@@ -105,6 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         loginInstructor: handleLoginInstructor,
         loginStudent: handleLoginStudent,
+        loginWithGoogle: handleLoginGoogle,
+        sendPasswordReset: handleResetPassword,
         logout,
         isAdmin: currentUser?.role === Role.INSTRUCTOR_MEDIALAB,
         isInstructor: currentUser?.role === Role.INSTRUCTOR_MEDIALAB

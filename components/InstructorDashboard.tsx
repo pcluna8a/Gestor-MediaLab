@@ -22,15 +22,12 @@ interface DashboardProps {
     users: User[];
     onNewLoan: (loan: LoanRecord) => void;
     onReturn: (loanId: string, returnConcept: string, returnStatus: string, returnPhoto?: string[], returnAnalysis?: string) => void;
-    onUpdateInventory: (newEquipment: Equipment[]) => void;
     onAddNewUser: (newUser: User) => { success: boolean; message: string } | Promise<{ success: boolean; message: string }>;
     onUpdateUser?: (user: User) => void;
     onAddNewEquipment: (newItem: Equipment) => void;
     onUpdateEquipmentImage: (equipmentId: string, newImageUrl: string) => void;
     onEditEquipment: (updatedItem: Equipment) => void;
     onDeleteEquipment: (itemId: string) => void;
-    checkpointTimestamp: string | null;
-    onCreateCheckpoint: () => void;
     isOnline: boolean;
 }
 
@@ -72,7 +69,7 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
             {/* Main Content Area */}
             <GlassCard className="min-h-[500px] p-6 animate-slide-up relative z-0">
                 <Suspense fallback={<div className="flex justify-center items-center h-64"><Spinner size="12" color="sena-green" /></div>}>
-                    {activeTab === 'home' && <HomeView loans={props.loans} equipment={props.equipment} />}
+                    {activeTab === 'home' && <HomeView loans={props.loans} equipment={props.equipment} onTabChange={setActiveTab} />}
                     {activeTab === 'newLoan' && <NewLoanView users={props.users} equipment={props.equipment} onNewLoan={props.onNewLoan} currentUser={props.currentUser} />}
                     {activeTab === 'activeLoans' && <ActiveLoansView loans={props.loans} equipment={props.equipment} users={props.users} onReturn={props.onReturn} />}
                     {activeTab === 'manageUsers' && (
@@ -89,7 +86,6 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                             onAddNewEquipment={props.onAddNewEquipment}
                             onEditEquipment={props.onEditEquipment}
                             onDeleteEquipment={props.onDeleteEquipment}
-                            onUpdateInventory={props.onUpdateInventory}
                             isOnline={props.isOnline}
                         />
                     )}

@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Equipment, LoanRecord, User } from '../types';
 import {
     subscribeToCollection,
-    checkCloudConnection,
     addEquipmentToCloud,
     updateEquipmentInCloud,
     deleteEquipmentInCloud,
@@ -19,7 +18,7 @@ interface DataContextType {
     users: User[]; // All users (for admin view)
     isOnline: boolean;
     lastSync: Date | null;
-    refreshConnection: () => Promise<void>;
+    refreshConnection: () => void;
 
     // Actions
     addEquipment: (item: Equipment) => Promise<void>;
@@ -40,13 +39,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [equipment, setEquipment] = useState<Equipment[]>([]);
     const [loans, setLoans] = useState<LoanRecord[]>([]);
     const [users, setUsers] = useState<User[]>([]);
-    const [isOnline, setIsOnline] = useState(false);
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [lastSync, setLastSync] = useState<Date | null>(null);
 
     // Network Status
-    const refreshConnection = async () => {
-        const online = await checkCloudConnection();
-        setIsOnline(online);
+    const refreshConnection = () => {
+        setIsOnline(navigator.onLine);
     };
 
     useEffect(() => {

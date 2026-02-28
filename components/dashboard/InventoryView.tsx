@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Equipment, EquipmentStatus } from '../../types';
-import { WrenchIcon, UploadIcon, PlusCircleIcon, SearchIcon } from '../Icons';
+import { WrenchIcon, UploadIcon, PlusCircleIcon, SearchIcon, CameraIcon, InformationCircleIcon } from '../Icons';
 import { seedCloudDatabase } from '../../services/firebaseService';
 import Modal from '../Modal';
 import Spinner from '../Spinner';
@@ -10,7 +10,6 @@ interface InventoryViewProps {
     onAddNewEquipment: (newItem: Equipment) => void;
     onEditEquipment: (updatedItem: Equipment) => void;
     onDeleteEquipment: (itemId: string) => void;
-    onUpdateInventory?: (newEquipment: Equipment[]) => void;
     isOnline: boolean;
 }
 
@@ -19,13 +18,24 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
     const [newItemName, setNewItemName] = useState('');
     const [newItemType, setNewItemType] = useState('Computer');
     const [newItemImage, setNewItemImage] = useState('');
-
     const [editItem, setEditItem] = useState<Equipment | null>(null);
+    const [viewDetailItem, setViewDetailItem] = useState<Equipment | null>(null);
 
     // Migration States
     const [isMigrating, setIsMigrating] = useState(false);
     const [migrationProgress, setMigrationProgress] = useState(0);
     const [migrationMessage, setMigrationMessage] = useState('');
+
+    const handleNewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setNewItemImage(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const handleAdd = (e: React.FormEvent) => {
         e.preventDefault();
@@ -66,6 +76,17 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
         if (editItem) {
             onEditEquipment(editItem);
             setEditItem(null);
+        }
+    };
+
+    const handleEditImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && editItem) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditItem({ ...editItem, imageUrl: reader.result as string });
+            };
+            reader.readAsDataURL(file);
         }
     };
 
@@ -150,6 +171,22 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                                 <option value="Appliance" className="bg-sena-dark">Electrodoméstico</option>
                             </select>
                         </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Fotografía (Opcional)</label>
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-lg bg-black/20 border border-white/10 flex items-center justify-center overflow-hidden">
+                                    {newItemImage ? (
+                                        <img src={newItemImage} alt="Preview" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <CameraIcon className="w-6 h-6 text-gray-600" />
+                                    )}
+                                </div>
+                                <label className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-center text-xs font-bold text-gray-400 hover:bg-white/10 cursor-pointer transition-all">
+                                    {newItemImage ? 'Cambiar Foto' : 'Subir Foto'}
+                                    <input type="file" accept="image/*" onChange={handleNewImageUpload} className="hidden" />
+                                </label>
+                            </div>
+                        </div>
                         <button type="submit" className="w-full bg-sena-green text-white font-bold py-3 px-4 rounded-lg hover:shadow-[0_0_15px_rgba(57,169,0,0.4)] transition-all hover:scale-[1.02] active:scale-95 mt-2">
                             Agregar al Inventario
                         </button>
@@ -170,8 +207,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                             <thead className="bg-black/20">
                                 <tr>
                                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Placa</th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nombre</th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Tipo</th>
+                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nombre / Descripción</th>
                                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Estado</th>
                                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Acciones</th>
                                 </tr>
@@ -180,8 +216,19 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                                 {equipment.map(e => (
                                     <tr key={e.id} className="hover:bg-white/5 transition-colors group">
                                         <td className="px-6 py-4 text-sm text-sena-green font-mono font-bold group-hover:text-white transition-colors">{e.id}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-300 font-medium">{e.name}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-400">{e.type}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-300 font-medium">
+                                            <div className="flex flex-col">
+                                                <span>{e.description || e.name}</span>
+                                                {e.currentDescription && (
+                                                    <button
+                                                        onClick={() => setViewDetailItem(e)}
+                                                        className="text-[10px] text-sena-green hover:underline mt-1 flex items-center gap-1 w-fit uppercase font-bold tracking-tighter"
+                                                    >
+                                                        <InformationCircleIcon className="w-3 h-3" /> Ver Detalle
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4 text-sm">
                                             <span className={`px-2 py-1 rounded text-xs font-bold border ${e.status === EquipmentStatus.AVAILABLE ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}`}>
                                                 {e.status === EquipmentStatus.AVAILABLE ? 'DISPONIBLE' : 'PRESTADO'}
@@ -206,34 +253,121 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                 </div>
             </div>
 
-            {/* Modal Edición */}
-            <Modal isOpen={!!editItem} onClose={() => setEditItem(null)} title="Editar Equipo">
-                {editItem && (
+
+            {/* Modal Detalle */}
+            <Modal isOpen={!!viewDetailItem} onClose={() => setViewDetailItem(null)} title="Detalle del Equipo">
+                {viewDetailItem && (
                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-bold mb-1">Nombre</label>
-                            <input value={editItem.name} onChange={e => setEditItem({ ...editItem, name: e.target.value })} className="w-full p-2 border rounded" />
+                        <div className="flex flex-col items-center">
+                            {viewDetailItem.imageUrl && (
+                                <img src={viewDetailItem.imageUrl} alt={viewDetailItem.name} className="w-48 h-48 rounded-lg object-cover mb-4 border border-white/10" />
+                            )}
+                            <h3 className="text-xl font-bold text-white uppercase text-center">{viewDetailItem.name}</h3>
+                            <p className="text-xs text-sena-green font-mono">{viewDetailItem.id}</p>
                         </div>
-                        <div>
-                            <label className="block text-sm font-bold mb-1">Tipo</label>
-                            <select value={editItem.type} onChange={e => setEditItem({ ...editItem, type: e.target.value })} className="w-full p-2 border rounded">
-                                <option value="Computer">Computador</option>
-                                <option value="Laptop">Portátil</option>
-                                <option value="Camera">Cámara</option>
-                                <option value="Accessory">Accesorio</option>
-                            </select>
+                        <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                            <h4 className="text-[10px] uppercase text-gray-500 tracking-widest font-bold mb-2">Información Técnica / Descripción Actual</h4>
+                            <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{viewDetailItem.currentDescription || 'Sin descripción técnica adicional.'}</p>
                         </div>
-                        <div>
-                            <label className="block text-sm font-bold mb-1">Estado Manual</label>
-                            <select value={editItem.status} onChange={e => setEditItem({ ...editItem, status: e.target.value as EquipmentStatus })} className="w-full p-2 border rounded">
-                                <option value={EquipmentStatus.AVAILABLE}>Disponible</option>
-                                <option value={EquipmentStatus.ON_LOAN}>En Préstamo</option>
-                            </select>
-                        </div>
-                        <button onClick={handleSaveEdit} className="w-full bg-sena-green text-white py-2 rounded font-bold">Guardar Cambios</button>
+                        <button onClick={() => setViewDetailItem(null)} className="w-full bg-white/10 text-white py-2 rounded font-bold hover:bg-white/20 transition-all">Cerrar</button>
                     </div>
                 )}
             </Modal>
+
+            {/* Isolated Edit View (Modal replacement behavior but in-page responsiveness) */}
+            {editItem && (
+                <div className="fixed inset-0 z-50 bg-sena-dark/95 backdrop-blur-xl animate-fade-in flex flex-col p-6 overflow-y-auto">
+                    <div className="max-w-4xl mx-auto w-full space-y-8">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-6">
+                            <div>
+                                <h2 className="text-3xl font-extrabold text-white uppercase tracking-tighter">Editando Equipo</h2>
+                                <p className="text-sena-green font-mono text-sm">{editItem.id}</p>
+                            </div>
+                            <button onClick={() => setEditItem(null)} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all">
+                                <span className="text-sm font-bold px-2">CANCELAR</span>
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                            {/* Left: Image Handling */}
+                            <div className="flex flex-col items-center justify-center space-y-4">
+                                <div className="relative group w-full aspect-square max-w-[300px]">
+                                    {editItem.imageUrl ? (
+                                        <img src={editItem.imageUrl} alt="Equipment" className="w-full h-full rounded-2xl object-cover border-2 border-white/10 shadow-2xl" />
+                                    ) : (
+                                        <div className="w-full h-full rounded-2xl bg-white/5 border-2 border-dashed border-white/10 flex flex-col items-center justify-center text-gray-500">
+                                            <CameraIcon className="w-12 h-12 mb-3" />
+                                            <span className="text-sm font-bold uppercase">Sin Imagen</span>
+                                        </div>
+                                    )}
+                                    <label className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 rounded-2xl transition-all cursor-pointer">
+                                        <UploadIcon className="w-10 h-10 text-white mb-2" />
+                                        <span className="text-white font-bold text-sm">CAMBIAR FOTO</span>
+                                        <input type="file" accept="image/*" onChange={handleEditImageUpload} className="hidden" />
+                                    </label>
+                                </div>
+                                <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-black">Control de Activo Fijo</p>
+                            </div>
+
+                            {/* Right: Data Handling */}
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Nombre / Descripción Corta</label>
+                                    <input
+                                        type="text"
+                                        value={editItem.description || editItem.name}
+                                        onChange={e => setEditItem({ ...editItem, description: e.target.value })}
+                                        className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white font-medium focus:border-sena-green outline-none transition-all"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Descripción Técnica (Detalle)</label>
+                                    <textarea
+                                        value={editItem.currentDescription || ''}
+                                        onChange={e => setEditItem({ ...editItem, currentDescription: e.target.value })}
+                                        rows={5}
+                                        className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white font-medium focus:border-sena-green outline-none transition-all resize-none"
+                                        placeholder="Ingrese especificaciones técnicas detalladas..."
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Estado</label>
+                                        <select
+                                            value={editItem.status}
+                                            onChange={e => setEditItem({ ...editItem, status: e.target.value as EquipmentStatus })}
+                                            className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white focus:border-sena-green outline-none appearance-none cursor-pointer"
+                                        >
+                                            <option value={EquipmentStatus.AVAILABLE} className="bg-sena-dark">Disponible</option>
+                                            <option value={EquipmentStatus.ON_LOAN} className="bg-sena-dark">En Préstamo</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Tipo (Referencia)</label>
+                                        <input
+                                            type="text"
+                                            value={editItem.type}
+                                            onChange={e => setEditItem({ ...editItem, type: e.target.value })}
+                                            className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white font-medium focus:border-sena-green outline-none transition-all"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-8 border-t border-white/5">
+                            <button
+                                onClick={handleSaveEdit}
+                                className="w-full bg-sena-green text-white py-5 rounded-2xl font-black text-xl hover:shadow-[0_0_30px_rgba(57,169,0,0.4)] transition-all transform hover:scale-[1.01] active:scale-[0.99] uppercase tracking-tighter"
+                            >
+                                Actualizar Registro de Equipo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

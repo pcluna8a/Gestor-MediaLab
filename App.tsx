@@ -46,9 +46,6 @@ const MainApp: React.FC = () => {
   } = useData();
 
   const { toast, showToast, closeToast } = useToast();
-  // Dark mode is now default/forced by design "Futurismo Institucional", but we keep state for toggle if user really wants light mode (though design specs say Dark/Glass).
-  // Actually specs say "Environment digital oscuro (Dark Mode)". Let's default to true and maybe hide toggle or keep it.
-  const [isDarkMode, setIsDarkMode] = useState(true);
 
   // Force dark mode class for Tailwind
   useEffect(() => {
@@ -165,15 +162,12 @@ const MainApp: React.FC = () => {
               users={users}
               onNewLoan={handleNewLoan}
               onReturn={handleReturn}
-              onUpdateInventory={() => { }}
               onAddNewUser={handleAddNewUser}
               onUpdateUser={handleUpdateUser}
               onAddNewEquipment={handleAddNewEquipment}
               onUpdateEquipmentImage={handleUpdateEquipmentImage}
               onEditEquipment={handleEditEquipment}
               onDeleteEquipment={handleDeleteEquipment}
-              checkpointTimestamp={null}
-              onCreateCheckpoint={() => { }}
               isOnline={isOnline}
             />
           ) : (

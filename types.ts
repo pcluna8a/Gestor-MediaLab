@@ -20,6 +20,7 @@ export interface User {
   email?: string;
   passwordHash?: string; // Stored as SHA-256 hash
   forcePasswordChange?: boolean; // True if user must change password on next login
+  photoURL?: string; // Profile picture (Base64)
 }
 
 export enum EquipmentStatus {
@@ -33,6 +34,8 @@ export interface Equipment {
   type: string;
   status: EquipmentStatus;
   imageUrl: string;
+  description?: string;
+  currentDescription?: string;
 }
 
 export interface LoanRecord {

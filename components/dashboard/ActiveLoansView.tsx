@@ -168,8 +168,8 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                                 <>
                                                     <img src={eq.imageUrl} alt="" className="w-8 h-8 rounded object-cover" />
                                                     <div>
-                                                        <div className="font-bold">{eq.name}</div>
-                                                        <div className="text-xs text-gray-500">{eq.id}</div>
+                                                        <div className="font-bold text-xs leading-tight uppercase">{eq.description || eq.name}</div>
+                                                        <div className="text-[10px] text-gray-500 mt-1">ID: {eq.id}</div>
                                                     </div>
                                                 </>
                                             ) : 'Equipo Desconocido'}

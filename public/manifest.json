@@ -1,0 +1,20 @@
+{
+    "short_name": "MediaLab",
+    "name": "Gestor de Préstamos MediaLab",
+    "icons": [
+        {
+            "src": "logoSena.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "logoSena.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "#00324D",
+    "background_color": "#00324D"
+}

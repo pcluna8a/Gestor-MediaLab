@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Role, UserCategory } from '../../types';
-import { UserGroupIcon, UserPlusIcon } from '../Icons';
+import { UserGroupIcon, UserPlusIcon, SearchIcon, UploadIcon, CameraIcon } from '../Icons';
 import Modal from '../Modal';
 
 interface ManageUsersViewProps {
@@ -18,10 +18,12 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
     const [newUserEmail, setNewUserEmail] = useState('');
 
     const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [userSearchTerm, setUserSearchTerm] = useState('');
 
     const [editName, setEditName] = useState('');
     const [editEmail, setEditEmail] = useState('');
     const [editRole, setEditRole] = useState<Role>(Role.USUARIO_MEDIALAB);
+    const [editPhoto, setEditPhoto] = useState('');
 
     const handleAddUser = (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,11 +47,23 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
         setNewUserRole(Role.USUARIO_MEDIALAB);
     };
 
+    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditPhoto(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const openEditModal = (user: User) => {
         setEditingUser(user);
         setEditName(user.name);
         setEditEmail(user.email || '');
         setEditRole(user.role);
+        setEditPhoto(user.photoURL || '');
     };
 
     const handleUpdateClick = () => {
@@ -58,15 +72,27 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                 ...editingUser,
                 name: editName.toUpperCase(),
                 email: editEmail,
-                role: editRole
+                role: editRole,
+                photoURL: editPhoto || undefined
             });
             setEditingUser(null);
+            setEditPhoto('');
         }
     };
 
-    // Sorted Users: A-Z by Name
-    const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name));
+    // Filtered and Sorted Users: Filter by search term, then Sort A-Z by Name
+    const filteredUsers = users.filter(u => {
+        const search = userSearchTerm.toLowerCase();
+        return (
+            u.id.toLowerCase().includes(search) ||
+            u.name.toLowerCase().includes(search) ||
+            (u.email && u.email.toLowerCase().includes(search))
+        );
+    });
+
+    const sortedUsers = [...filteredUsers].sort((a, b) => a.name.localeCompare(b.name));
     const usersCount = users.length;
+    const filteredCount = filteredUsers.length;
 
     return (
         <div className="space-y-6 animate-fade-in text-gray-200">
@@ -141,9 +167,25 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
 
                 {/* Tabla Usuarios */}
                 <div className="lg:col-span-2 bg-white/5 rounded-xl border border-white/10 overflow-hidden flex flex-col">
-                    <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
-                        <h4 className="font-bold text-gray-200">Directorio de Usuarios</h4>
-                        <span className="text-xs text-gray-500">Ordenado A-Z</span>
+                    <div className="p-4 border-b border-white/10 bg-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="flex flex-col">
+                            <h4 className="font-bold text-gray-200">Directorio de Usuarios</h4>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-widest">
+                                {userSearchTerm ? `Filtrados: ${filteredCount} de ${usersCount}` : 'Ordenado A-Z'}
+                            </span>
+                        </div>
+                        <div className="relative w-full md:w-64">
+                            <input
+                                type="text"
+                                value={userSearchTerm}
+                                onChange={e => setUserSearchTerm(e.target.value)}
+                                placeholder="Buscar ID o nombre..."
+                                className="w-full pl-10 pr-4 py-2 bg-black/40 border border-white/10 rounded-full text-sm text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all"
+                            />
+                            <div className="absolute left-3.5 top-2.5 text-gray-500">
+                                <SearchIcon className="w-4 h-4" />
+                            </div>
+                        </div>
                     </div>
                     <div className="flex-1 overflow-x-auto overflow-y-auto max-h-[600px] scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                         <table className="min-w-full divide-y divide-white/10 text-left">
@@ -158,7 +200,18 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                             <tbody className="divide-y divide-white/5">
                                 {sortedUsers.map(u => (
                                     <tr key={u.id} className="hover:bg-white/5 transition-colors group">
-                                        <td className="px-6 py-4 text-sm font-mono text-gray-400 group-hover:text-white">{u.id}</td>
+                                        <td className="px-6 py-4 text-sm font-mono text-gray-400 group-hover:text-white">
+                                            <div className="flex items-center gap-3">
+                                                {u.photoURL ? (
+                                                    <img src={u.photoURL} alt={u.name} className="w-8 h-8 rounded-full object-cover border border-white/20" />
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/5">
+                                                        <span className="text-[10px] text-gray-400">{u.name.substring(0, 2).toUpperCase()}</span>
+                                                    </div>
+                                                )}
+                                                {u.id}
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4 text-sm font-medium text-white">{u.name}</td>
                                         <td className="px-6 py-4 text-sm text-gray-400">
                                             <span className={`px-2 py-1 rounded text-xs ${u.role === Role.INSTRUCTOR_MEDIALAB ? 'bg-blue-500/20 text-blue-300' : 'bg-white/10 text-gray-300'}`}>
@@ -183,9 +236,28 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                 </div>
             </div>
 
-            {/* Modal Edición */}
             <Modal isOpen={!!editingUser} onClose={() => setEditingUser(null)} title="Editar Usuario">
                 <div className="space-y-4">
+                    {editRole === Role.INSTRUCTOR_MEDIALAB && (
+                        <div className="flex flex-col items-center mb-6 pt-2">
+                            <div className="relative group cursor-pointer">
+                                {editPhoto ? (
+                                    <img src={editPhoto} alt="Preview" className="w-32 h-32 rounded-xl object-cover border-2 border-sena-green shadow-[0_0_15px_rgba(57,169,0,0.3)]" />
+                                ) : (
+                                    <div className="w-32 h-32 rounded-xl bg-white/5 border-2 border-dashed border-white/10 flex flex-col items-center justify-center text-gray-500 hover:border-sena-green hover:text-sena-green transition-all">
+                                        <CameraIcon className="w-8 h-8 mb-2" />
+                                        <span className="text-[10px] font-bold uppercase">Sin Foto</span>
+                                    </div>
+                                )}
+                                <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 rounded-xl transition-opacity cursor-pointer">
+                                    <UploadIcon className="w-6 h-6 text-white" />
+                                    <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+                                </label>
+                            </div>
+                            <p className="text-[10px] text-gray-500 mt-2 uppercase tracking-widest font-bold">Fotografía de Perfil</p>
+                        </div>
+                    )}
+
                     <div>
                         <label className="block text-sm font-bold mb-1">Nombre</label>
                         <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded" />
