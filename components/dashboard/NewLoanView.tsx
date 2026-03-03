@@ -23,16 +23,16 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
             if (!equipmentSearchTerm) return true;
             const term = equipmentSearchTerm.toLowerCase();
             return (
-                e.name.toLowerCase().includes(term) ||
-                e.id.toLowerCase().includes(term) ||
-                e.description?.toLowerCase().includes(term)
+                (e.name || '').toLowerCase().includes(term) ||
+                (e.id || '').toLowerCase().includes(term) ||
+                (e.description || '').toLowerCase().includes(term)
             );
         });
     // ... (omitting eligibleUsers for brevity if possible, but replace_file_content needs exact match)
     // Filter users by category and search term
     const eligibleUsers = users
         .filter(u => {
-            if (!selectedCategory) return u.role === Role.USUARIO_MEDIALAB; // Default behavior
+            if (!selectedCategory) return true; // Default behavior: show all users
             if (selectedCategory === 'INSTRUCTOR-MEDIALAB') return u.role === Role.INSTRUCTOR_MEDIALAB;
             return u.role === Role.USUARIO_MEDIALAB && u.category === selectedCategory;
         })
@@ -40,8 +40,8 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
             if (!searchTerm) return true;
             const term = searchTerm.toLowerCase();
             return (
-                u.name.toLowerCase().includes(term) ||
-                u.id.includes(term)
+                (u.name || '').toLowerCase().includes(term) ||
+                (u.id || '').toLowerCase().includes(term)
             );
         });
 

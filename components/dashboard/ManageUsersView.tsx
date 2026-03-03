@@ -259,16 +259,23 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                     )}
 
                     <div>
-                        <label className="block text-sm font-bold mb-1">Nombre</label>
-                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded" />
+                        <label className="block text-xs font-medium text-gray-400 mb-1">Identificación (No editable)</label>
+                        <input type="text" value={editingUser?.id || ''} disabled className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-gray-500 cursor-not-allowed outline-none" />
                     </div>
-                    {editRole === Role.INSTRUCTOR_MEDIALAB && (
-                        <div>
-                            <label className="block text-sm font-bold mb-1">Email</label>
-                            <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-2 border rounded" />
-                        </div>
-                    )}
-                    <button onClick={handleUpdateClick} className="w-full bg-sena-green text-white py-2 rounded">Guardar Cambios</button>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">Nombre Completo</label>
+                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all" />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">Correo Electrónico</label>
+                        <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all" />
+                    </div>
+
+                    <div className="pt-2">
+                        <button onClick={handleUpdateClick} className="w-full bg-sena-green text-white font-bold py-3 px-4 rounded-lg hover:shadow-[0_0_15px_rgba(57,169,0,0.4)] transition-all hover:scale-[1.02] active:scale-95">Guardar Cambios</button>
+                    </div>
                 </div>
             </Modal>
         </div>
