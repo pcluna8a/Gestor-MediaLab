@@ -61,13 +61,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Data Subscriptions
     useEffect(() => {
-        // Only verify subscriptions if we are online or offline-init logic handles it.
-        // subscribeToCollection handles offline fallback internally.
-
+        // Equipment is public (read: if true), so it can load immediately
         const unsubEq = subscribeToCollection('equipment', (data) => {
             setEquipment(data as Equipment[]);
             setLastSync(new Date());
         });
+
+        return () => {
+            unsubEq();
+        };
+    }, []);
+
+    // Authenticated Subscriptions
+    useEffect(() => {
+        // Only verify subscriptions if we are logged in
+        if (!currentUser) {
+            setLoans([]);
+            setUsers([]);
+            return;
+        }
 
         const unsubLoans = subscribeToCollection('loans', (data) => {
             // Parse dates if they come as strings
@@ -85,11 +97,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
         return () => {
-            unsubEq();
             unsubLoans();
             unsubUsers();
         };
-    }, []);
+    }, [currentUser]);
 
     // Actions Wrappers
     const addEquipment = async (item: Equipment) => {

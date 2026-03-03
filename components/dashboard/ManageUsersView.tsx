@@ -84,13 +84,13 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
     const filteredUsers = users.filter(u => {
         const search = userSearchTerm.toLowerCase();
         return (
-            u.id.toLowerCase().includes(search) ||
-            u.name.toLowerCase().includes(search) ||
+            (u.id && u.id.toLowerCase().includes(search)) ||
+            (u.name && u.name.toLowerCase().includes(search)) ||
             (u.email && u.email.toLowerCase().includes(search))
         );
     });
 
-    const sortedUsers = [...filteredUsers].sort((a, b) => a.name.localeCompare(b.name));
+    const sortedUsers = [...filteredUsers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const usersCount = users.length;
     const filteredCount = filteredUsers.length;
 
@@ -206,7 +206,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                                                     <img src={u.photoURL} alt={u.name} className="w-8 h-8 rounded-full object-cover border border-white/20" />
                                                 ) : (
                                                     <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/5">
-                                                        <span className="text-[10px] text-gray-400">{u.name.substring(0, 2).toUpperCase()}</span>
+                                                        <span className="text-[10px] text-gray-400">{(u.name || 'U').substring(0, 2).toUpperCase()}</span>
                                                     </div>
                                                 )}
                                                 {u.id}
