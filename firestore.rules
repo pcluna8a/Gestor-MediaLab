@@ -1,21 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user has instructor role
-    // Uses email from the auth token to find the user document
-    function isInstructor() {
-      return request.auth != null &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) == false &&
-        get(/databases/$(database)/documents/users/$(request.auth.token.email.split('@')[0])).data.role == 'INSTRUCTOR-MEDIALAB';
-    }
-
-    // More robust: check by querying any user doc that has uid == auth.uid with role INSTRUCTOR
-    function isAuthenticatedInstructor() {
-      return request.auth != null;
-      // NOTE: Firestore rules cannot do collection queries.
-      // The practical approach is to use Custom Claims set via Admin SDK.
-      // For now, we rely on client-side role checks and broad authenticated access.
-    }
 
     // Rules for equipment collection
     match /equipment/{equipmentId} {
@@ -34,7 +19,6 @@ service cloud.firestore {
     // Rules for users collection
     match /users/{userId} {
       allow read: if request.auth != null;
-      // Allow users to write their own profile (for student self-registration)
       allow write: if request.auth != null;
     }
 

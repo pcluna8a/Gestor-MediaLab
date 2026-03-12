@@ -270,12 +270,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
                             {topEquipment.map((item, idx) => (
                                 <div key={idx} className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                            idx === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-500/20 text-yellow-400' :
                                             idx === 1 ? 'bg-gray-400/20 text-gray-300' :
-                                            idx === 2 ? 'bg-amber-700/20 text-amber-600' :
-                                            'bg-white/10 text-gray-400'
-                                        }`}>
+                                                idx === 2 ? 'bg-amber-700/20 text-amber-600' :
+                                                    'bg-white/10 text-gray-400'
+                                            }`}>
                                             {idx + 1}
                                         </span>
                                         <span className="text-sm text-gray-300 truncate max-w-[150px]">{item.name}</span>
