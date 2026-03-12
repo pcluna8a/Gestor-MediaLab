@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, Role, UserCategory } from '../../types';
 import { UserGroupIcon, UserPlusIcon, SearchIcon, UploadIcon, CameraIcon } from '../Icons';
 import Modal from '../Modal';
+import Pagination from '../Pagination';
 
 interface ManageUsersViewProps {
     users: User[];
@@ -19,6 +20,8 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
 
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [userSearchTerm, setUserSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
 
     const [editName, setEditName] = useState('');
     const [editEmail, setEditEmail] = useState('');
@@ -93,6 +96,12 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
     const sortedUsers = [...filteredUsers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const usersCount = users.length;
     const filteredCount = filteredUsers.length;
+
+    const totalPages = Math.ceil(sortedUsers.length / ITEMS_PER_PAGE);
+    const paginatedUsers = sortedUsers.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     return (
         <div className="space-y-6 animate-fade-in text-gray-200">
@@ -178,9 +187,10 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                             <input
                                 type="text"
                                 value={userSearchTerm}
-                                onChange={e => setUserSearchTerm(e.target.value)}
+                                onChange={e => { setUserSearchTerm(e.target.value); setCurrentPage(1); }}
                                 placeholder="Buscar ID o nombre..."
                                 className="w-full pl-10 pr-4 py-2 bg-black/40 border border-white/10 rounded-full text-sm text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all"
+                                aria-label="Buscar usuarios"
                             />
                             <div className="absolute left-3.5 top-2.5 text-gray-500">
                                 <SearchIcon className="w-4 h-4" />
@@ -198,7 +208,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                                {sortedUsers.map(u => (
+                                {paginatedUsers.map(u => (
                                     <tr key={u.id} className="hover:bg-white/5 transition-colors group">
                                         <td className="px-6 py-4 text-sm font-mono text-gray-400 group-hover:text-white">
                                             <div className="flex items-center gap-3">
@@ -219,7 +229,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-sm font-medium">
-                                            <button onClick={() => openEditModal(u)} className="text-sena-green hover:text-green-400 transition-colors">Editar</button>
+                                            <button onClick={() => openEditModal(u)} className="text-sena-green hover:text-green-400 transition-colors" aria-label={`Editar usuario ${u.name}`}>Editar</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -233,6 +243,13 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                             </tbody>
                         </table>
                     </div>
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                        totalItems={sortedUsers.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                    />
                 </div>
             </div>
 

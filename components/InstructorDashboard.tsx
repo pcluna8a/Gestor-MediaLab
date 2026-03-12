@@ -34,6 +34,7 @@ interface DashboardProps {
 const TabButton: React.FC<{ icon: React.ReactNode, text: string, isActive: boolean, onClick: () => void }> = ({ icon, text, isActive, onClick }) => (
     <button
         onClick={onClick}
+        aria-label={text}
         className={`flex items-center gap-3 py-3 px-5 rounded-full font-medium text-sm transition-all duration-300 relative overflow-hidden group ${isActive
             ? 'bg-sena-green text-white shadow-[0_0_15px_rgba(57,169,0,0.6)] border border-sena-green'
             : 'bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10'
@@ -89,7 +90,7 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                             isOnline={props.isOnline}
                         />
                     )}
-                    {activeTab === 'reports' && <ReportsView loans={props.loans} />}
+                    {activeTab === 'reports' && <ReportsView loans={props.loans} equipment={props.equipment} />}
                 </Suspense>
             </GlassCard>
         </div>

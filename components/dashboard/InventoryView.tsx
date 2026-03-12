@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Equipment, EquipmentStatus } from '../../types';
 import { WrenchIcon, UploadIcon, PlusCircleIcon, SearchIcon, CameraIcon, InformationCircleIcon } from '../Icons';
 import { seedCloudDatabase } from '../../services/firebaseService';
 import Modal from '../Modal';
 import Spinner from '../Spinner';
+import Pagination from '../Pagination';
+import ConfirmDialog from '../ConfirmDialog';
 
 interface InventoryViewProps {
     equipment: Equipment[];
@@ -20,11 +22,35 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
     const [newItemImage, setNewItemImage] = useState('');
     const [editItem, setEditItem] = useState<Equipment | null>(null);
     const [viewDetailItem, setViewDetailItem] = useState<Equipment | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
+
+    // Delete confirmation state
+    const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
     // Migration States
     const [isMigrating, setIsMigrating] = useState(false);
     const [migrationProgress, setMigrationProgress] = useState(0);
     const [migrationMessage, setMigrationMessage] = useState('');
+
+    // Filtered and paginated equipment
+    const filteredEquipment = useMemo(() => {
+        if (!searchTerm.trim()) return equipment;
+        const term = searchTerm.toLowerCase();
+        return equipment.filter(e =>
+            e.id.toLowerCase().includes(term) ||
+            e.name.toLowerCase().includes(term) ||
+            (e.description || '').toLowerCase().includes(term) ||
+            e.type.toLowerCase().includes(term)
+        );
+    }, [equipment, searchTerm]);
+
+    const totalPages = Math.ceil(filteredEquipment.length / ITEMS_PER_PAGE);
+    const paginatedEquipment = filteredEquipment.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     const handleNewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -91,8 +117,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
     };
 
     const handleDelete = (id: string) => {
-        if (confirm("¿Estás seguro de eliminar este equipo? Esta acción no se puede deshacer.")) {
-            onDeleteEquipment(id);
+        setDeleteTarget(id);
+    };
+
+    const confirmDelete = () => {
+        if (deleteTarget) {
+            onDeleteEquipment(deleteTarget);
+            setDeleteTarget(null);
         }
     };
 
@@ -199,7 +230,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                         <h4 className="font-bold text-gray-200">Listado de Activos</h4>
                         <div className="relative">
                             <SearchIcon className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                            <input type="text" placeholder="Buscar..." className="pl-9 pr-4 py-1.5 bg-black/20 border border-white/10 rounded-full text-sm text-gray-300 focus:outline-none focus:border-sena-green w-48 transition-all focus:w-64" />
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                placeholder="Buscar por placa, nombre o tipo..."
+                                className="pl-9 pr-4 py-1.5 bg-black/20 border border-white/10 rounded-full text-sm text-gray-300 focus:outline-none focus:border-sena-green w-48 transition-all focus:w-64"
+                                aria-label="Buscar equipos"
+                            />
                         </div>
                     </div>
                     <div className="flex-1 overflow-x-auto">
@@ -213,7 +251,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                                {equipment.map(e => (
+                                {paginatedEquipment.map(e => (
                                     <tr key={e.id} className="hover:bg-white/5 transition-colors group">
                                         <td className="px-6 py-4 text-sm text-sena-green font-mono font-bold group-hover:text-white transition-colors">{e.id}</td>
                                         <td className="px-6 py-4 text-sm text-gray-300 font-medium">
@@ -223,6 +261,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                                                     <button
                                                         onClick={() => setViewDetailItem(e)}
                                                         className="text-[10px] text-sena-green hover:underline mt-1 flex items-center gap-1 w-fit uppercase font-bold tracking-tighter"
+                                                        aria-label={`Ver detalle de ${e.name}`}
                                                     >
                                                         <InformationCircleIcon className="w-3 h-3" /> Ver Detalle
                                                     </button>
@@ -235,23 +274,42 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-sm font-medium flex gap-3">
-                                            <button onClick={() => setEditItem(e)} className="text-blue-400 hover:text-white transition-colors">Editar</button>
-                                            <button onClick={() => handleDelete(e.id)} className="text-red-400 hover:text-red-200 transition-colors">Eliminar</button>
+                                            <button onClick={() => setEditItem(e)} className="text-blue-400 hover:text-white transition-colors" aria-label={`Editar ${e.name}`}>Editar</button>
+                                            <button onClick={() => handleDelete(e.id)} className="text-red-400 hover:text-red-200 transition-colors" aria-label={`Eliminar ${e.name}`}>Eliminar</button>
                                         </td>
                                     </tr>
                                 ))}
-                                {equipment.length === 0 && (
+                                {filteredEquipment.length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">
-                                            Inventario vacío. Agrega items usando el panel izquierdo.
+                                            {searchTerm ? 'No se encontraron equipos con ese criterio.' : 'Inventario vacío. Agrega items usando el panel izquierdo.'}
                                         </td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                        totalItems={filteredEquipment.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                    />
                 </div>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                title="¿Eliminar equipo?"
+                message="Esta acción no se puede deshacer. El equipo será eliminado permanentemente del inventario."
+                confirmLabel="Eliminar"
+                cancelLabel="Cancelar"
+                onConfirm={confirmDelete}
+                onCancel={() => setDeleteTarget(null)}
+                variant="danger"
+            />
 
 
             {/* Modal Detalle */}

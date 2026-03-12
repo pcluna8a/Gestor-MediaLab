@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider, useData } from './contexts/DataContext';
 import { LoginScreen } from './components/LoginScreen';
 import GlassCard from './components/GlassCard';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const getGreetingName = (fullName: string): string => {
   if (!fullName) return 'Usuario';
@@ -187,11 +188,13 @@ const MainApp: React.FC = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <DataProvider>
-        <MainApp />
-      </DataProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <DataProvider>
+          <MainApp />
+        </DataProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dark">
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <link rel="icon" type="image/png" href="/logoSena.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Sistema integral de préstamos de equipos audiovisuales - SENA CIES MediaLab" />
+  <meta name="theme-color" content="#00324D" />
+  <link rel="apple-touch-icon" href="/logoSena.png" />
   <link rel="manifest" href="/manifest.json" />
   <title>Gestor de Préstamos MediaLab</title>
   <!-- Google Fonts: Work Sans -->
@@ -12,56 +15,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700&display=swap"
     rel="stylesheet">
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Work Sans', 'sans-serif'],
-          },
-          colors: {
-            'sena-green': '#39A900', // Verde corporativo oficial SENA
-            'sena-blue': '#00324D',  // Azul SENA
-            'sena-dark': '#111827',  // Fondo oscuro profundo (Gray 900)
-          },
-          boxShadow: {
-            'neon': '0 0 10px rgba(57, 169, 0, 0.5)',
-          },
-          animation: {
-            'fade-in': 'fadeIn 0.5s ease-out forwards',
-            'slide-up': 'slideUp 0.5s ease-out forwards',
-          },
-          keyframes: {
-            fadeIn: {
-              '0%': { opacity: '0' },
-              '100%': { opacity: '1' },
-            },
-            slideUp: {
-              '0%': { opacity: '0', transform: 'translateY(20px)' },
-              '100%': { opacity: '1', transform: 'translateY(0)' },
-            },
-          }
-        },
-      },
-    }
-  </script>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
-    "jspdf": "https://jspm.dev/jspdf",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
-    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/"
-  }
-}
-</script>
 </head>
 
 <body class="bg-[#00324D] text-white min-h-screen">

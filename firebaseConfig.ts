@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 
@@ -12,30 +12,25 @@ const firebaseConfig = {
   appId: "1:366861561386:web:4ddab8b9ba88e7edfa9d53"
 };
 
-let app;
-let dbInstance;
-let authInstance;
-let functionsInstance;
+let app: ReturnType<typeof initializeApp> | undefined;
+let dbInstance: ReturnType<typeof initializeFirestore> | undefined;
+let authInstance: ReturnType<typeof getAuth> | undefined;
+let functionsInstance: ReturnType<typeof getFunctions> | undefined;
 
 try {
-  // Inicializar Firebase de manera segura
   app = initializeApp(firebaseConfig);
-  dbInstance = getFirestore(app);
 
-  // Habilitar persistencia sin bloqueo (best-effort)
-  enableIndexedDbPersistence(dbInstance).catch((err: any) => {
-    if (err.code == 'failed-precondition') {
-      console.warn('Persistencia fallida: Múltiples pestañas abiertas.');
-    } else if (err.code == 'unimplemented') {
-      console.warn('El navegador no soporta persistencia.');
-    }
+  // Use modern persistence API (replaces deprecated enableIndexedDbPersistence)
+  dbInstance = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
   });
 
   authInstance = getAuth(app);
   functionsInstance = getFunctions(app);
 } catch (error) {
   console.warn("Firebase could not be initialized (Offline Mode will be used):", error);
-  // No re-lanzamos el error para permitir que la app cargue en modo offline
 }
 
 export const db = dbInstance;

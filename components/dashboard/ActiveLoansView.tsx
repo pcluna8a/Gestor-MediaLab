@@ -5,6 +5,7 @@ import Modal from '../Modal';
 import Spinner from '../Spinner';
 import { CameraIcon } from '../Icons';
 import { CameraCapture } from '../CameraCapture';
+import Pagination from '../Pagination';
 
 interface ActiveLoansViewProps {
     loans: LoanRecord[];
@@ -15,6 +16,14 @@ interface ActiveLoansViewProps {
 
 const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, users, onReturn }) => {
     const activeLoans = loans.filter(l => !l.returnDate).sort((a, b) => b.loanDate.getTime() - a.loanDate.getTime());
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
+    const totalPages = Math.ceil(activeLoans.length / ITEMS_PER_PAGE);
+    const paginatedLoans = activeLoans.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     const [selectedLoan, setSelectedLoan] = useState<LoanRecord | null>(null);
     const [returnConcept, setReturnConcept] = useState('');
@@ -158,7 +167,7 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                 <td colSpan={4} className="px-6 py-4 text-center text-gray-500">No hay préstamos activos.</td>
                             </tr>
                         ) : (
-                            activeLoans.map((loan) => {
+                            paginatedLoans.map((loan) => {
                                 const eq = equipment.find(e => e.id === loan.equipmentId);
                                 const usr = users.find(u => u.id === loan.borrowerId);
                                 return (
@@ -177,7 +186,7 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{usr ? usr.name : loan.borrowerId}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{loan.loanDate.toLocaleDateString()} {loan.loanDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <button onClick={() => openReturnModal(loan)} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-bold">Registrar Devolución</button>
+                                            <button onClick={() => openReturnModal(loan)} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-bold" aria-label={`Registrar devolución de ${eq?.name || loan.equipmentId}`}>Registrar Devolución</button>
                                         </td>
                                     </tr>
                                 );
@@ -186,6 +195,13 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                     </tbody>
                 </table>
             </div>
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={activeLoans.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+            />
         </div>
     );
 };

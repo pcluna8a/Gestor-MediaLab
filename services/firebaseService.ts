@@ -17,7 +17,6 @@ import {
 import { signInAnonymously } from "firebase/auth";
 import { Equipment, LoanRecord, User, EquipmentStatus, Role } from '../types';
 import { DEFAULT_EQUIPMENT } from './initialData';
-import { INITIAL_USERS } from '../constants';
 
 // --- CONSTANTES ---
 const COLL_EQUIPMENT = 'equipment';
@@ -190,12 +189,14 @@ export const registerNewLoanInCloud = async (loan: LoanRecord) => {
             const equipmentRef = doc(db!, COLL_EQUIPMENT, loan.equipmentId);
             const loanRef = doc(db!, COLL_LOANS, loan.id);
 
-            const equipmentDoc = await transaction.get(equipmentRef);
-            if (!equipmentDoc.exists()) throw new Error("El equipo no existe en la base de datos.");
-
-            const currentStatus = equipmentDoc.data().status;
-            if (currentStatus === EquipmentStatus.ON_LOAN) {
-                throw new Error("El equipo ya ha sido prestado a otro usuario.");
+            // Check if equipment is already on loan
+            const equipmentSnap = await transaction.get(equipmentRef);
+            if (!equipmentSnap.exists()) {
+                throw new Error('El equipo no existe en el inventario.');
+            }
+            const equipmentData = equipmentSnap.data();
+            if (equipmentData.status === EquipmentStatus.ON_LOAN) {
+                throw new Error('Este equipo ya se encuentra prestado. Debe ser devuelto antes de generar un nuevo préstamo.');
             }
 
             const loanData = {
@@ -325,7 +326,7 @@ export const seedCloudDatabase = async (onProgress?: (message: string, percentag
     try {
         const allOperations: { type: 'set', ref: any, data: any }[] = [];
 
-        // 1. Equipos (Usamos DEFAULT_EQUIPMENT como base si no hay nada en la nube)
+        // Seed equipment data from initialData
         DEFAULT_EQUIPMENT.forEach(eq => {
             allOperations.push({
                 type: 'set',
@@ -333,19 +334,6 @@ export const seedCloudDatabase = async (onProgress?: (message: string, percentag
                 data: eq
             });
         });
-
-        // 2. Usuarios
-        for (const u of INITIAL_USERS) {
-            if (u.role === Role.INSTRUCTOR_MEDIALAB && !u.passwordHash) {
-                u.passwordHash = await hashPassword(u.id);
-                u.forcePasswordChange = true;
-            }
-            allOperations.push({
-                type: 'set',
-                ref: doc(db!, COLL_USERS, u.id),
-                data: u
-            });
-        }
 
         const totalDocs = allOperations.length;
         const BATCH_SIZE = 400;

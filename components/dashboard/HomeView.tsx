@@ -30,10 +30,11 @@ const HomeView: React.FC<HomeViewProps> = ({ loans, equipment, onTabChange }) =>
 
     const stats = useMemo(() => {
         const total = equipment.length;
-        const onLoan = equipment.filter(e => e.status === EquipmentStatus.ON_LOAN).length;
-        const available = equipment.filter(e => e.status === EquipmentStatus.AVAILABLE).length;
+        // Count active loans (no returnDate) as the single source of truth
+        const onLoan = loans.filter(l => !l.returnDate).length;
+        const available = total - equipment.filter(e => e.status === EquipmentStatus.ON_LOAN).length;
         return { total, onLoan, available };
-    }, [equipment]);
+    }, [equipment, loans]);
 
     const chartData = useMemo(() => {
         const days = 7;
