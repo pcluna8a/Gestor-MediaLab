@@ -6,12 +6,13 @@ import Pagination from '../Pagination';
 
 interface ManageUsersViewProps {
     users: User[];
+    currentUser: User;
     onAddNewUser: (newUser: User) => { success: boolean; message: string };
     onUpdateUser: (user: User) => void;
     isOnline: boolean;
 }
 
-const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, onUpdateUser, isOnline }) => {
+const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, onAddNewUser, onUpdateUser, isOnline }) => {
     const [newUserId, setNewUserId] = useState('');
     const [newUserName, setNewUserName] = useState('');
     const [newUserRole, setNewUserRole] = useState<Role>(Role.USUARIO_MEDIALAB);
@@ -83,8 +84,15 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
         }
     };
 
-    // Filtered and Sorted Users: Filter by search term, then Sort A-Z by Name
-    const filteredUsers = users.filter(u => {
+    type SortKey = 'id' | 'name' | 'role';
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
+
+    // Filtered and Sorted Users
+    const allowedUsers = currentUser?.isSuperAdmin 
+        ? users 
+        : users.filter(u => u.role !== Role.INSTRUCTOR_MEDIALAB);
+        
+    const filteredUsers = allowedUsers.filter(u => {
         const search = userSearchTerm.toLowerCase();
         return (
             (u.id && u.id.toLowerCase().includes(search)) ||
@@ -93,8 +101,43 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
         );
     });
 
-    const sortedUsers = [...filteredUsers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const usersCount = users.length;
+    const sortedUsers = React.useMemo(() => {
+        let sortableUsers = [...filteredUsers];
+        if (sortConfig !== null) {
+            sortableUsers.sort((a, b) => {
+                let aValue = a[sortConfig.key] || '';
+                let bValue = b[sortConfig.key] || '';
+                
+                if (sortConfig.key === 'role') {
+                    // special rule to sort by human readable role basically
+                    aValue = a.role === Role.INSTRUCTOR_MEDIALAB ? 'INSTRUCTOR' : (a.category || 'APRENDIZ');
+                    bValue = b.role === Role.INSTRUCTOR_MEDIALAB ? 'INSTRUCTOR' : (b.category || 'APRENDIZ');
+                }
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        } else {
+             // Fallback default sort
+             sortableUsers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        }
+        return sortableUsers;
+    }, [filteredUsers, sortConfig]);
+
+    const requestSort = (key: SortKey) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const usersCount = allowedUsers.length;
     const filteredCount = filteredUsers.length;
 
     const totalPages = Math.ceil(sortedUsers.length / ITEMS_PER_PAGE);
@@ -145,7 +188,9 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                                 <label className="block text-xs font-medium text-gray-400 mb-1">Rol</label>
                                 <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as Role)} className="w-full p-3 bg-black/20 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none appearance-none">
                                     <option value={Role.USUARIO_MEDIALAB} className="bg-sena-dark">Usuario</option>
-                                    <option value={Role.INSTRUCTOR_MEDIALAB} className="bg-sena-dark">Instructor</option>
+                                    {currentUser?.isSuperAdmin && (
+                                        <option value={Role.INSTRUCTOR_MEDIALAB} className="bg-sena-dark">Instructor</option>
+                                    )}
                                 </select>
                             </div>
 
@@ -201,9 +246,21 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                         <table className="min-w-full divide-y divide-white/10 text-left">
                             <thead className="bg-black/20 sticky top-0 backdrop-blur-md">
                                 <tr>
-                                    <th className="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider">ID</th>
-                                    <th className="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider">Nombre</th>
-                                    <th className="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider">Rol</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider cursor-pointer select-none transition-colors" onClick={() => requestSort('id')}>
+                                        <div className="flex items-center gap-1">
+                                            ID {sortConfig?.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider cursor-pointer select-none transition-colors" onClick={() => requestSort('name')}>
+                                        <div className="flex items-center gap-1">
+                                            Nombre {sortConfig?.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider cursor-pointer select-none transition-colors" onClick={() => requestSort('role')}>
+                                        <div className="flex items-center gap-1">
+                                            Rol {sortConfig?.key === 'role' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </div>
+                                    </th>
                                     <th className="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider">Acciones</th>
                                 </tr>
                             </thead>
@@ -289,6 +346,16 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, onAddNewUser, 
                         <label className="block text-xs font-medium text-gray-400 mb-1">Correo Electrónico</label>
                         <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all" />
                     </div>
+                    
+                    {currentUser?.isSuperAdmin && (
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">Rol</label>
+                            <select value={editRole} onChange={e => setEditRole(e.target.value as Role)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none appearance-none">
+                                <option value={Role.USUARIO_MEDIALAB} className="bg-sena-dark">Usuario</option>
+                                <option value={Role.INSTRUCTOR_MEDIALAB} className="bg-sena-dark">Instructor</option>
+                            </select>
+                        </div>
+                    )}
 
                     <div className="pt-2">
                         <button onClick={handleUpdateClick} className="w-full bg-sena-green text-white font-bold py-3 px-4 rounded-lg hover:shadow-[0_0_15px_rgba(57,169,0,0.4)] transition-all hover:scale-[1.02] active:scale-95">Guardar Cambios</button>

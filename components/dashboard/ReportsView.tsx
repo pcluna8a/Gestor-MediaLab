@@ -146,6 +146,52 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
         return `${(hours / 24).toFixed(1)} días`;
     };
 
+    const { currentUser } = require('../../contexts/AuthContext').useAuth();
+    const { registerReturn } = require('../../contexts/DataContext').useData();
+    const [editingLoan, setEditingLoan] = useState<LoanRecord | null>(null);
+    const [editStatus, setEditStatus] = useState('Bueno');
+    const [editConcept, setEditConcept] = useState('');
+    const { useToast } = require('../Toast');
+    const { showToast } = useToast();
+    const { logAuditAction } = require('../../services/firebaseService');
+
+    const openEditModal = (loan: LoanRecord) => {
+        if (!currentUser?.isSuperAdmin) return;
+        setEditingLoan(loan);
+        setEditStatus(loan.returnStatus || 'Bueno');
+        setEditConcept(loan.returnConcept || '');
+    };
+
+    const handleForceEdit = async () => {
+        if (!editingLoan || !currentUser?.isSuperAdmin) return;
+        
+        const result = await registerReturn(
+            editingLoan.id, 
+            editingLoan.equipmentId, 
+            { 
+                 concept: editConcept, 
+                 status: editStatus, 
+                 photos: editingLoan.returnPhotos || [], 
+                 analysis: editingLoan.returnConditionAnalysis || '' 
+            }
+        );
+        
+        if (result.success) {
+            await logAuditAction('FORCE_EDIT_LOAN', currentUser.id, currentUser.name, editingLoan.id, {
+                oldStatus: editingLoan.returnStatus,
+                newStatus: editStatus,
+                oldConcept: editingLoan.returnConcept,
+                newConcept: editConcept
+            });
+            showToast("Préstamo cerrado editado exitosamente", "success");
+        } else {
+            showToast("Error al forzar edición", "error");
+        }
+        setEditingLoan(null);
+    };
+
+    const Modal = require('../Modal').default;
+
     return (
         <div className="space-y-6 animate-fade-in">
             {/* Date Filters */}
@@ -321,16 +367,91 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
             </div>
 
             {/* AI Analysis Result */}
-            {analysis && (
-                <div className="bg-white/5 p-6 rounded-xl border border-white/10 border-t-2 border-t-purple-500 animate-fade-in">
+            {/* Detailed Closed Loans Table for Super Admins */}
+            {currentUser?.isSuperAdmin && (
+                <div className="bg-white/5 p-6 rounded-xl border border-white/10 mt-8">
                     <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2">
-                        <SparklesIcon className="w-5 h-5 text-purple-400" /> Resultados del Análisis
+                        <DocumentReportIcon className="w-5 h-5 text-red-400" /> Préstamos Cerrados (Solo Super Admin)
                     </h3>
-                    <div className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
-                        {analysis}
+                    <p className="text-gray-400 text-sm mb-4">Desde aquí puedes forzar la edición del estado final o concepto de los préstamos ya devueltos. Esta acción será auditada.</p>
+                    <div className="overflow-x-auto max-h-96">
+                        <table className="min-w-full divide-y divide-white/10 text-left">
+                            <thead className="bg-black/20 sticky top-0 backdrop-blur-md">
+                                <tr>
+                                    <th className="px-4 py-3 text-xs font-medium text-gray-400 uppercase">Equipo</th>
+                                    <th className="px-4 py-3 text-xs font-medium text-gray-400 uppercase">Usuario</th>
+                                    <th className="px-4 py-3 text-xs font-medium text-gray-400 uppercase">F. Devolución</th>
+                                    <th className="px-4 py-3 text-xs font-medium text-gray-400 uppercase">Estado</th>
+                                    <th className="px-4 py-3 text-xs font-medium text-gray-400 uppercase">Concepto</th>
+                                    <th className="px-4 py-3 text-xs font-medium text-gray-400 uppercase">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {filteredLoans.filter(l => l.returnDate).map(loan => (
+                                    <tr key={loan.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="px-4 py-3 text-sm text-gray-300 font-mono truncate max-w-[120px]" title={loan.equipmentId}>{loan.equipmentId}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-300 font-mono truncate max-w-[120px]" title={loan.borrowerId}>{loan.borrowerId}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-400">{new Date(loan.returnDate!).toLocaleDateString()}</td>
+                                        <td className="px-4 py-3 text-sm">
+                                            <span className={`px-2 py-1 rounded text-xs border ${loan.returnStatus === 'Malo' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                                                {loan.returnStatus}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-500 truncate max-w-[150px]" title={loan.returnConcept}>{loan.returnConcept || '-'}</td>
+                                        <td className="px-4 py-3 text-sm">
+                                            <button onClick={() => openEditModal(loan)} className="text-orange-400 hover:text-orange-300 font-bold text-xs" aria-label="Forzar edición">FORZAR EDICIÓN</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}
+
+            {/* Force Edit Modal */}
+            <Modal isOpen={!!editingLoan} onClose={() => setEditingLoan(null)} title="Forzar Edición de Préstamo">
+                <div className="space-y-4">
+                    <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-md text-red-200 text-xs">
+                        <strong>Atención:</strong> Estás modificando un registro histórico cerrado. Esta acción quedará grabada en el log de auditoría.
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Nuevo Estado Final</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {['Excelente', 'Bueno', 'Aceptable', 'Regular', 'Malo'].map(status => (
+                                <button
+                                    key={status}
+                                    onClick={() => setEditStatus(status)}
+                                    className={`py-2 px-1 text-sm rounded border ${editStatus === status
+                                        ? 'bg-orange-500 text-white border-orange-500'
+                                        : 'bg-black/20 border-white/10 text-gray-400'
+                                    }`}
+                                >
+                                    {status}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Nuevo Concepto</label>
+                        <textarea
+                            value={editConcept}
+                            onChange={e => setEditConcept(e.target.value)}
+                            className="w-full p-3 border rounded-lg bg-black/40 border-white/10 text-white focus:border-orange-500 outline-none"
+                            rows={3}
+                        />
+                    </div>
+                    
+                    <button
+                        onClick={handleForceEdit}
+                        className="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-500 transition-colors mt-4"
+                    >
+                        Confirmar y Auditar
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
 };

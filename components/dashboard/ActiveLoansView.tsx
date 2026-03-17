@@ -183,7 +183,12 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                                 </>
                                             ) : 'Equipo Desconocido'}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{usr ? usr.name : loan.borrowerId}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-bold text-gray-900 dark:text-white uppercase">
+                                                {usr ? (usr.name !== 'Usuario' ? usr.name : 'Usuario Registrado') : 'Usuario Desconocido'}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 font-mono mt-1">ID: {loan.borrowerId}</div>
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{loan.loanDate.toLocaleDateString()} {loan.loanDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <button onClick={() => openReturnModal(loan)} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-bold" aria-label={`Registrar devolución de ${eq?.name || loan.equipmentId}`}>Registrar Devolución</button>

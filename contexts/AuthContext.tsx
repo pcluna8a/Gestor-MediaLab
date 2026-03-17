@@ -3,15 +3,17 @@ import { User, Role, UserCategory } from '../types';
 import { auth, db } from '../firebaseConfig';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, query, where, getDocs, limit, doc, getDoc } from 'firebase/firestore';
-import { loginInstructor, loginStudent, logoutUser, loginWithGoogle as loginWithGoogleService, sendPasswordReset as sendResetService } from '../services/firebaseService';
+import { loginInstructor, loginStudent, logoutUser, loginWithGoogle as loginWithGoogleService, sendPasswordReset as sendResetService, completeUserProfile } from '../services/firebaseService';
 
 interface AuthContextType {
     currentUser: User | null;
+    pendingProfileUser: FirebaseUser | null;
     isLoading: boolean;
     loginInstructor: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-    loginStudent: (email: string, password: string, category: UserCategory) => Promise<{ success: boolean; error?: string }>;
+    loginStudent: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
     loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
     sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
+    completeProfile: (id: string, category: UserCategory) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
     isAdmin: boolean;
     isInstructor: boolean;
@@ -22,33 +24,33 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Helper to find user profile by Auth data
 const fetchUserProfile = async (firebaseUser: FirebaseUser): Promise<User | null> => {
     try {
-        // 1. If Instructors (Email Auth)
-        if (firebaseUser.email) {
-            // Query users collection by email
-            const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email), limit(1));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                return querySnapshot.docs[0].data() as User;
-            }
-        }
-
-        // 2. If Students (Anonymous Auth) OR if Email lookup failed but we have a UID link
-        // Search by 'uid' field which we now save on loginStudent
+        // Since we are moving to a unified ID system, and we always bind UID into the document,
+        // we can safely query the 'users' collection where 'uid' == firebaseUser.uid.
         const qUid = query(collection(db, 'users'), where('uid', '==', firebaseUser.uid), limit(1));
         const uidSnapshot = await getDocs(qUid);
         if (!uidSnapshot.empty) {
             return uidSnapshot.docs[0].data() as User;
         }
 
-        return null;
+        // Keep a fallback just in case old admins were only registered by email without UID
+        if (firebaseUser.email) {
+            const qEmail = query(collection(db, 'users'), where('email', '==', firebaseUser.email), limit(1));
+            const emailSnapshot = await getDocs(qEmail);
+            if (!emailSnapshot.empty) {
+                return emailSnapshot.docs[0].data() as User;
+            }
+        }
+
+        return null; // Profile is incomplete
     } catch (error) {
         console.error("Error fetching user profile:", error);
-        return null;
+        return null; // Force profile completion if fetch fails
     }
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [pendingProfileUser, setPendingProfileUser] = useState<FirebaseUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -57,12 +59,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const userProfile = await fetchUserProfile(firebaseUser);
                 if (userProfile) {
                     setCurrentUser(userProfile);
+                    setPendingProfileUser(null);
                 } else {
-                    console.warn("User authenticated but no profile found in Firestore.");
                     setCurrentUser(null);
+                    setPendingProfileUser(firebaseUser); // Profile missing Document ID
                 }
             } else {
                 setCurrentUser(null);
+                setPendingProfileUser(null);
             }
             setIsLoading(false);
         });
@@ -70,57 +74,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => unsubscribe();
     }, []);
 
-    // Handlers
-    const handleLoginInstructor = async (email: string, password: string) => {
-        const res = await loginInstructor(email, password);
+    const processLoginResult = async (res: any) => {
         if (res.success && res.user) {
             const userProfile = await fetchUserProfile(res.user as FirebaseUser);
             if (userProfile) {
                 setCurrentUser(userProfile);
-                return { success: true };
+                setPendingProfileUser(null);
             } else {
-                return { success: false, error: "Usuario no encontrado en base de datos." };
+                setCurrentUser(null);
+                setPendingProfileUser(res.user as FirebaseUser);
             }
-        }
-        return { success: false, error: res.error };
-    };
-
-    const handleLoginStudent = async (email: string, password: string, category: UserCategory) => {
-        const res = await loginStudent(email, password, category);
-        if (res.success && res.user) {
-            // Check if we need to update the currentUser state manually
-            // With the new logic, onAuthStateChanged might handle it, but setting it here is faster/safer response
-            // The loginStudent service returns the Firestore User object, so we can just set it.
-            setCurrentUser(res.user);
             return { success: true };
         }
         return { success: false, error: res.error };
     };
 
+    // Handlers
+    const handleLoginInstructor = async (email: string, password: string) => {
+        const res = await loginInstructor(email, password);
+        return processLoginResult(res);
+    };
+
+    const handleLoginStudent = async (email: string, password: string) => {
+        const res = await loginStudent(email, password);
+        return processLoginResult(res);
+    };
+
     const handleLoginGoogle = async () => {
         const res = await loginWithGoogleService();
+        return processLoginResult(res);
+    };
+
+    const handleCompleteProfile = async (id: string, category: UserCategory) => {
+        if (!pendingProfileUser) return { success: false, error: "No hay cuenta pendiente vinculada." };
+        
+        const isGoogleProvider = pendingProfileUser.providerData.some(p => p.providerId === 'google.com');
+        const email = isGoogleProvider ? undefined : pendingProfileUser.email || undefined;
+        const emailGoogle = isGoogleProvider ? pendingProfileUser.email || undefined : undefined;
+        const name = pendingProfileUser.displayName || 'Usuario Registrado';
+        
+        const res = await completeUserProfile(id, pendingProfileUser.uid, category, email, emailGoogle, name);
         if (res.success && res.user) {
-            const userProfile = await fetchUserProfile(res.user as FirebaseUser);
-            if (userProfile) {
-                setCurrentUser(userProfile);
-                return { success: true };
-            } else {
-                // If Google user has no profile, create a default one
-                const newUser: User = {
-                    id: (res.user as FirebaseUser).email?.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') || (res.user as FirebaseUser).uid,
-                    uid: (res.user as FirebaseUser).uid,
-                    email: (res.user as FirebaseUser).email || '',
-                    name: (res.user as FirebaseUser).displayName || 'Usuario Google',
-                    role: Role.USUARIO_MEDIALAB,
-                    category: UserCategory.APRENDIZ // Default
-                };
-                // We should ideally call addUserToCloud here, but for simplicity we rely on the next login or manual registration
-                // Let's actually save it to be safe
-                const { addUserToCloud } = await import('../services/firebaseService');
-                await addUserToCloud(newUser);
-                setCurrentUser(newUser);
-                return { success: true };
-            }
+            setCurrentUser(res.user);
+            setPendingProfileUser(null);
+            return { success: true };
         }
         return { success: false, error: res.error };
     };
@@ -132,15 +129,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const logout = async () => {
         await logoutUser();
         setCurrentUser(null);
+        setPendingProfileUser(null);
     };
 
     const value = {
         currentUser,
+        pendingProfileUser,
         isLoading,
         loginInstructor: handleLoginInstructor,
         loginStudent: handleLoginStudent,
         loginWithGoogle: handleLoginGoogle,
         sendPasswordReset: handleResetPassword,
+        completeProfile: handleCompleteProfile,
         logout,
         isAdmin: currentUser?.role === Role.INSTRUCTOR_MEDIALAB,
         isInstructor: currentUser?.role === Role.INSTRUCTOR_MEDIALAB

@@ -34,20 +34,55 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
     const [migrationProgress, setMigrationProgress] = useState(0);
     const [migrationMessage, setMigrationMessage] = useState('');
 
-    // Filtered and paginated equipment
+    type SortKey = 'id' | 'name' | 'status';
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
+
+    // Filtered equipment
     const filteredEquipment = useMemo(() => {
-        if (!searchTerm.trim()) return equipment;
+        if (!searchTerm?.trim()) return equipment;
         const term = searchTerm.toLowerCase();
         return equipment.filter(e =>
-            e.id.toLowerCase().includes(term) ||
-            e.name.toLowerCase().includes(term) ||
-            (e.description || '').toLowerCase().includes(term) ||
-            e.type.toLowerCase().includes(term)
+            (e?.id || '').toLowerCase().includes(term) ||
+            (e?.name || '').toLowerCase().includes(term) ||
+            (e?.description || '').toLowerCase().includes(term) ||
+            (e?.type || '').toLowerCase().includes(term)
         );
     }, [equipment, searchTerm]);
 
-    const totalPages = Math.ceil(filteredEquipment.length / ITEMS_PER_PAGE);
-    const paginatedEquipment = filteredEquipment.slice(
+    const sortedEquipment = React.useMemo(() => {
+        let sortableEquipment = [...filteredEquipment];
+        if (sortConfig !== null) {
+            sortableEquipment.sort((a, b) => {
+                let aValue = a[sortConfig.key] || '';
+                let bValue = b[sortConfig.key] || '';
+                
+                if (sortConfig.key === 'name') {
+                    aValue = a.description || a.name;
+                    bValue = b.description || b.name;
+                }
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableEquipment;
+    }, [filteredEquipment, sortConfig]);
+
+    const requestSort = (key: SortKey) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const totalPages = Math.ceil(sortedEquipment.length / ITEMS_PER_PAGE);
+    const paginatedEquipment = sortedEquipment.slice(
         (currentPage - 1) * ITEMS_PER_PAGE,
         currentPage * ITEMS_PER_PAGE
     );
@@ -244,9 +279,21 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                         <table className="min-w-full divide-y divide-white/10">
                             <thead className="bg-black/20">
                                 <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Placa</th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nombre / Descripción</th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Estado</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider cursor-pointer select-none transition-colors" onClick={() => requestSort('id')}>
+                                        <div className="flex items-center gap-1">
+                                            Placa {sortConfig?.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider cursor-pointer select-none transition-colors" onClick={() => requestSort('name')}>
+                                        <div className="flex items-center gap-1">
+                                            Nombre / Descripción {sortConfig?.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider cursor-pointer select-none transition-colors" onClick={() => requestSort('status')}>
+                                        <div className="flex items-center gap-1">
+                                            Estado {sortConfig?.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </div>
+                                    </th>
                                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Acciones</th>
                                 </tr>
                             </thead>
@@ -279,7 +326,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
                                         </td>
                                     </tr>
                                 ))}
-                                {filteredEquipment.length === 0 && (
+                                {sortedEquipment.length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">
                                             {searchTerm ? 'No se encontraron equipos con ese criterio.' : 'Inventario vacío. Agrega items usando el panel izquierdo.'}

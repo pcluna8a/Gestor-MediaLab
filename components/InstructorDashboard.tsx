@@ -3,7 +3,7 @@ import React, { useState, Suspense } from 'react';
 import { User, LoanRecord, Equipment } from '../types';
 import Spinner from './Spinner';
 import GlassCard from './GlassCard';
-import { HomeIcon, PlusCircleIcon, ClipboardListIcon, UserGroupIcon, WrenchIcon, DocumentReportIcon } from './Icons';
+import { HomeIcon, PlusCircleIcon, ClipboardListIcon, UserGroupIcon, WrenchIcon, DocumentReportIcon, CogIcon } from './Icons';
 
 // Lazy Load Sub-components
 const HomeView = React.lazy(() => import('./dashboard/HomeView'));
@@ -12,8 +12,10 @@ const ActiveLoansView = React.lazy(() => import('./dashboard/ActiveLoansView'));
 const ManageUsersView = React.lazy(() => import('./dashboard/ManageUsersView'));
 const InventoryView = React.lazy(() => import('./dashboard/InventoryView'));
 const ReportsView = React.lazy(() => import('./dashboard/ReportsView'));
+const AuditLogsView = React.lazy(() => import('./dashboard/AuditLogsView'));
+const SystemSettingsView = React.lazy(() => import('./dashboard/SystemSettingsView'));
 
-type Tab = 'home' | 'newLoan' | 'activeLoans' | 'manageUsers' | 'inventory' | 'reports';
+type Tab = 'home' | 'newLoan' | 'activeLoans' | 'manageUsers' | 'inventory' | 'reports' | 'auditData' | 'systemSettings';
 
 interface DashboardProps {
     currentUser: User;
@@ -62,7 +64,12 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                         <TabButton icon={<ClipboardListIcon className="w-5 h-5" />} text="Activos" isActive={activeTab === 'activeLoans'} onClick={() => setActiveTab('activeLoans')} />
                         <TabButton icon={<UserGroupIcon className="w-5 h-5" />} text="Usuarios" isActive={activeTab === 'manageUsers'} onClick={() => setActiveTab('manageUsers')} />
                         <TabButton icon={<WrenchIcon className="w-5 h-5" />} text="Inventario" isActive={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} />
-                        <TabButton icon={<DocumentReportIcon className="w-5 h-5" />} text="Reportes" isActive={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
+                        {props.currentUser?.isSuperAdmin && (
+                            <>
+                                <TabButton icon={<DocumentReportIcon className="w-5 h-5" />} text="Auditoría" isActive={activeTab === 'auditData'} onClick={() => setActiveTab('auditData')} />
+                                <TabButton icon={<CogIcon className="w-5 h-5" />} text="Ajustes" isActive={activeTab === 'systemSettings'} onClick={() => setActiveTab('systemSettings')} />
+                            </>
+                        )}
                     </nav>
                 </div>
             </div>
@@ -76,6 +83,7 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                     {activeTab === 'manageUsers' && (
                         <ManageUsersView
                             users={props.users}
+                            currentUser={props.currentUser}
                             onAddNewUser={props.onAddNewUser as any}
                             onUpdateUser={props.onUpdateUser || (() => { })}
                             isOnline={props.isOnline}
@@ -91,6 +99,8 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                         />
                     )}
                     {activeTab === 'reports' && <ReportsView loans={props.loans} equipment={props.equipment} />}
+                    {activeTab === 'auditData' && props.currentUser?.isSuperAdmin && <AuditLogsView />}
+                    {activeTab === 'systemSettings' && props.currentUser?.isSuperAdmin && <SystemSettingsView />}
                 </Suspense>
             </GlassCard>
         </div>

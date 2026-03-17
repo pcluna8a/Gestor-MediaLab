@@ -12,10 +12,11 @@ import {
     deleteDoc,
     updateDoc,
     limit,
-    where
+    where,
+    getDoc
 } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
-import { Equipment, LoanRecord, User, EquipmentStatus, Role } from '../types';
+import { Equipment, LoanRecord, User, EquipmentStatus, Role, UserCategory, AuditLog, SystemSettings } from '../types';
 import { DEFAULT_EQUIPMENT } from './initialData';
 
 // --- CONSTANTES ---
@@ -85,7 +86,7 @@ export const loginInstructor = async (email: string, password: string) => {
 };
 
 // Login para Aprendices/Usuarios (Email/Password + Registro en Firestore si es nuevo)
-export const loginStudent = async (email: string, password: string, category: string, name: string = 'Usuario') => {
+export const loginStudent = async (email: string, password: string) => {
     if (!auth || !db) return { success: false, error: "Servicios no inicializados" };
     try {
         let userCredential;
@@ -101,48 +102,10 @@ export const loginStudent = async (email: string, password: string, category: st
                 return { success: false, error: `Error de autenticación: ${createError.message}` };
             }
         }
-
-        const id = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-        const userRef = doc(db, COLL_USERS, id);
-        const userSnap = await getDocs(query(collection(db, COLL_USERS), where('email', '==', email), limit(1)));
-
-        let userData: User;
-
-        if (!userSnap.empty) {
-            userData = userSnap.docs[0].data() as User;
-            const updates: any = {};
-
-            if (userData.category !== category) {
-                updates.category = category;
-                userData.category = category as any;
-            }
-
-            if (!userData.uid && auth.currentUser?.uid) {
-                updates.uid = auth.currentUser.uid;
-                userData.uid = auth.currentUser.uid;
-            }
-
-            if (!userData.email) {
-                updates.email = email;
-                userData.email = email;
-            }
-
-            if (Object.keys(updates).length > 0) {
-                await updateDoc(userSnap.docs[0].ref, updates);
-            }
-        } else {
-            userData = {
-                id: id,
-                uid: auth.currentUser?.uid,
-                email: email,
-                name: name,
-                role: Role.USUARIO_MEDIALAB,
-                category: category as any
-            };
-            await setDoc(userRef, userData);
-        }
-
-        return { success: true, user: userData };
+        
+        // Return only the Firebase User. Firestore document unification 
+        // will be handled explicitly via completeUserProfile.
+        return { success: true, user: userCredential.user };
     } catch (error: any) {
         console.error("Student login error:", error);
         return { success: false, error: error.message };
@@ -156,6 +119,67 @@ export const logoutUser = async () => {
         return { success: true };
     } catch (error: any) {
         return { success: false, error: error.message };
+    }
+};
+
+export const completeUserProfile = async (
+    id: string,
+    uid: string,
+    category: string,
+    email?: string,
+    emailGoogle?: string,
+    name: string = 'Usuario Registrado'
+) => {
+    if (!db) return { success: false, error: "Servicios no inicializados" };
+
+    try {
+        const userRef = doc(db, COLL_USERS, id);
+        
+        await runTransaction(db, async (transaction) => {
+            const userSnap = await transaction.get(userRef);
+            
+            if (userSnap.exists()) {
+                // User exists, merge data
+                const userData = userSnap.data() as User;
+                const updates: any = {};
+                
+                if (uid && !userData.uid) updates.uid = uid;
+                if (email && !userData.email) updates.email = email;
+                if (emailGoogle && !userData.emailGoogle) updates.emailGoogle = emailGoogle;
+                if (category && userData.category !== category) {
+                    updates.category = category;
+                    if (category === UserCategory.SUPER_ADMIN) {
+                        updates.role = Role.INSTRUCTOR_MEDIALAB;
+                        updates.isSuperAdmin = true;
+                    }
+                }
+                
+                if (Object.keys(updates).length > 0) {
+                    transaction.update(userRef, updates);
+                }
+            } else {
+                // User does not exist, create new unified record
+                const newUser: User = {
+                    id,
+                    uid,
+                    name,
+                    role: category === UserCategory.SUPER_ADMIN ? Role.INSTRUCTOR_MEDIALAB : Role.USUARIO_MEDIALAB,
+                    category: category as any,
+                };
+                if (category === UserCategory.SUPER_ADMIN) newUser.isSuperAdmin = true;
+                if (email) newUser.email = email;
+                if (emailGoogle) newUser.emailGoogle = emailGoogle;
+                
+                transaction.set(userRef, newUser);
+            }
+        });
+
+        // After transaction, get the final document to return it
+        const finalSnap = await getDoc(userRef);
+        return { success: true, user: finalSnap.data() as User };
+    } catch (error: any) {
+        console.error("Profile completion error:", error);
+        return { success: false, error: error.message || String(error) };
     }
 };
 
@@ -258,6 +282,23 @@ export const updateUserInCloud = async (user: User) => {
     return addUserToCloud(user);
 };
 
+export const deleteUserInCloud = async (
+    userId: string,
+    actorId?: string,
+    actorName?: string
+) => {
+    if (!db) return { success: false, error: "Base de datos no disponible" };
+    try {
+        await deleteDoc(doc(db, COLL_USERS, userId));
+        if (actorId && actorName) {
+            await logAuditAction('DELETE_USER', actorId, actorName, userId);
+        }
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message || String(e) };
+    }
+};
+
 export const updateUserCredentials = async (userId: string, email: string, newPasswordHash: string) => {
     if (!db) return { success: false, error: "Base de datos no disponible" };
     try {
@@ -300,10 +341,17 @@ export const updateEquipmentInCloud = async (updatedItem: Equipment) => {
     }
 };
 
-export const deleteEquipmentInCloud = async (itemId: string) => {
+export const deleteEquipmentInCloud = async (
+    itemId: string,
+    actorId?: string,
+    actorName?: string
+) => {
     if (!db) return { success: false, error: "Base de datos no disponible" };
     try {
         await deleteDoc(doc(db, COLL_EQUIPMENT, itemId));
+        if (actorId && actorName) {
+            await logAuditAction('DELETE_EQUIPMENT', actorId, actorName, itemId);
+        }
         return { success: true };
     } catch (e: any) {
         return { success: false, error: e.message || String(e) };
@@ -362,3 +410,33 @@ export const seedCloudDatabase = async (onProgress?: (message: string, percentag
     }
 };
 
+
+// --- SISTEMA SUPER-ADMIN: AUDITORÍA Y SETTINGS ---
+
+export const logAuditAction = async (action: string, actorId: string, actorName: string, targetId: string, metadata?: any) => {
+    if (!db) return;
+    try {
+        const logData: AuditLog = {
+            id: `AL_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            action,
+            actorId,
+            actorName,
+            targetId,
+            timestamp: new Date().toISOString(),
+            metadata: metadata || {}
+        };
+        await setDoc(doc(db, 'audit_logs', logData.id), logData);
+    } catch (e: any) {
+        console.error("Failed to log audit action:", e.message);
+    }
+};
+
+export const updateSystemSettings = async (settings: Partial<SystemSettings>) => {
+    if (!db) return { success: false, error: "Base de datos no disponible" };
+    try {
+        await setDoc(doc(db, 'system_settings', 'global'), settings, { merge: true });
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: String(e) };
+    }
+};

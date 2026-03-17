@@ -8,6 +8,7 @@ export enum UserCategory {
   APRENDIZ = 'APRENDIZ',
   ADMINISTRATIVO = 'ADMINISTRATIVO',
   INSTRUCTOR = 'INSTRUCTOR',
+  SUPER_ADMIN = 'SUPER-ADMIN',
 }
 
 export interface User {
@@ -18,9 +19,26 @@ export interface User {
   // Security Fields
   uid?: string; // Firebase Auth UID
   email?: string;
+  emailGoogle?: string;
   passwordHash?: string; // Stored as SHA-256 hash
   forcePasswordChange?: boolean; // True if user must change password on next login
   photoURL?: string; // Profile picture (Base64)
+  isSuperAdmin?: boolean; // True if user has SUPER-ADMIN capabilities
+}
+
+export interface AuditLog {
+  id: string;
+  action: string; // e.g., 'DELETE_EQUIPMENT', 'FORCE_EDIT_LOAN', 'DELETE_USER'
+  actorId: string; // The ID of the Super Admin who performed the action
+  actorName: string;
+  targetId: string; // The ID of the affected document
+  timestamp: string; // ISO String
+  metadata?: any; // Extra details about the action
+}
+
+export interface SystemSettings {
+  maintenanceMode: boolean;
+  termsAndConditions: string;
 }
 
 export enum EquipmentStatus {

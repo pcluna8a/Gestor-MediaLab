@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Equipment, LoanRecord, User } from '../types';
+import { Equipment, LoanRecord, User, SystemSettings } from '../types';
 import {
     subscribeToCollection,
     addEquipmentToCloud,
@@ -11,6 +11,8 @@ import {
     updateEquipmentImageInCloud
 } from '../services/firebaseService';
 import { useAuth } from './AuthContext';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 
 interface DataContextType {
     equipment: Equipment[];
@@ -18,6 +20,7 @@ interface DataContextType {
     users: User[]; // All users (for admin view)
     isOnline: boolean;
     lastSync: Date | null;
+    systemSettings: SystemSettings | null;
     refreshConnection: () => void;
 
     // Actions
@@ -29,7 +32,8 @@ interface DataContextType {
     registerLoan: (loan: LoanRecord) => Promise<{ success: boolean; error?: string }>;
     registerReturn: (loanId: string, equipmentId: string, data: { concept: string, status: string, photos: string[], analysis: string }) => Promise<{ success: boolean; error?: string }>;
 
-    addUser: (user: User) => Promise<void>; // Ideally this also handles Auth creation if needed, but for now just DB
+    addUser: (user: User) => Promise<void>; 
+    deleteUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -39,6 +43,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [equipment, setEquipment] = useState<Equipment[]>([]);
     const [loans, setLoans] = useState<LoanRecord[]>([]);
     const [users, setUsers] = useState<User[]>([]);
+    const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [lastSync, setLastSync] = useState<Date | null>(null);
 
@@ -57,6 +62,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
+    }, []);
+
+    // Global Settings Subscription
+    useEffect(() => {
+        if (!db) return;
+        const unsubSettings = onSnapshot(doc(db, 'system_settings', 'global'), (docSnap) => {
+            if (docSnap.exists()) {
+                setSystemSettings(docSnap.data() as SystemSettings);
+            }
+        });
+        return () => unsubSettings();
     }, []);
 
     // Data Subscriptions
@@ -112,6 +128,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const deleteEquipment = async (id: string) => {
+        if (currentUser?.isSuperAdmin) {
+            return await deleteEquipmentInCloud(id, currentUser.id, currentUser.name);
+        }
         return await deleteEquipmentInCloud(id);
     };
 
@@ -120,6 +139,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const registerLoan = async (loan: LoanRecord) => {
+        if (systemSettings?.maintenanceMode && !currentUser?.isSuperAdmin) {
+            return { success: false, error: "El sistema de préstamos está temporalmente deshabilitado." };
+        }
         return await registerNewLoanInCloud(loan);
     };
 
@@ -131,12 +153,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await addUserToCloud(user);
     };
 
+    const deleteUser = async (userId: string) => {
+        if (!currentUser?.isSuperAdmin) {
+            return { success: false, error: "No tienes permisos para eliminar usuarios." };
+        }
+        // Assuming deleteUserInCloud is imported from firebaseService
+        const { deleteUserInCloud } = await import('../services/firebaseService');
+        return await deleteUserInCloud(userId, currentUser.id, currentUser.name);
+    };
+
     const value = {
         equipment,
         loans,
         users,
         isOnline,
         lastSync,
+        systemSettings,
         refreshConnection,
         addEquipment,
         updateEquipment,
@@ -144,7 +176,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateEquipmentImage,
         registerLoan,
         registerReturn,
-        addUser
+        addUser,
+        deleteUser
     };
 
     return (

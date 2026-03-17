@@ -7,6 +7,7 @@ import { Toast, useToast } from './components/Toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider, useData } from './contexts/DataContext';
 import { LoginScreen } from './components/LoginScreen';
+import { CompleteProfileModal } from './components/CompleteProfileModal';
 import GlassCard from './components/GlassCard';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -31,7 +32,7 @@ const getGreetingName = (fullName: string): string => {
 };
 
 const MainApp: React.FC = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, pendingProfileUser, logout } = useAuth();
   const {
     equipment,
     loans,
@@ -51,6 +52,26 @@ const MainApp: React.FC = () => {
   // Force dark mode class for Tailwind
   useEffect(() => {
     document.documentElement.classList.add('dark');
+  }, []);
+
+  // Temporary effect to inject the SUPER ADMINISTRADOR user 
+  useEffect(() => {
+    const injectSuperAdmin = async () => {
+      try {
+        const superAdminUser: User = {
+          id: "999999999",
+          name: "SUPER ADMINISTRADOR",
+          emailGoogle: "paceluo@gmail.com",
+          category: "SUPER-ADMIN" as any,
+          role: Role.INSTRUCTOR_MEDIALAB
+        };
+        await addUser(superAdminUser);
+        console.log("SUPER-ADMIN injected correctly.");
+      } catch (e) {
+        console.error("Failed to inject SUPER-ADMIN", e);
+      }
+    };
+    injectSuperAdmin();
   }, []);
 
   const handleNewLoan = async (loan: LoanRecord) => {
@@ -112,7 +133,7 @@ const MainApp: React.FC = () => {
     return (
       <>
         {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
-        <LoginScreen />
+        {pendingProfileUser ? <CompleteProfileModal /> : <LoginScreen />}
       </>
     );
   }
