@@ -47,7 +47,7 @@ export const LoginScreen: React.FC = () => {
             return;
         }
 
-        const result = await loginStudent(email, password, studentCategory);
+        const result = await loginStudent(email, password);
         if (!result.success) {
             setError(result.error || "Error al ingresar");
         }

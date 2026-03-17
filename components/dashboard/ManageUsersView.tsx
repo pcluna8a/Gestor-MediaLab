@@ -88,10 +88,10 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
 
     // Filtered and Sorted Users
-    const allowedUsers = currentUser?.isSuperAdmin 
-        ? users 
+    const allowedUsers = currentUser?.isSuperAdmin
+        ? users
         : users.filter(u => u.role !== Role.INSTRUCTOR_MEDIALAB);
-        
+
     const filteredUsers = allowedUsers.filter(u => {
         const search = userSearchTerm.toLowerCase();
         return (
@@ -107,7 +107,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
             sortableUsers.sort((a, b) => {
                 let aValue = a[sortConfig.key] || '';
                 let bValue = b[sortConfig.key] || '';
-                
+
                 if (sortConfig.key === 'role') {
                     // special rule to sort by human readable role basically
                     aValue = a.role === Role.INSTRUCTOR_MEDIALAB ? 'INSTRUCTOR' : (a.category || 'APRENDIZ');
@@ -123,8 +123,8 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                 return 0;
             });
         } else {
-             // Fallback default sort
-             sortableUsers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            // Fallback default sort
+            sortableUsers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         }
         return sortableUsers;
     }, [filteredUsers, sortConfig]);
@@ -346,7 +346,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                         <label className="block text-xs font-medium text-gray-400 mb-1">Correo Electrónico</label>
                         <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all" />
                     </div>
-                    
+
                     {currentUser?.isSuperAdmin && (
                         <div>
                             <label className="block text-xs font-medium text-gray-400 mb-1">Rol</label>

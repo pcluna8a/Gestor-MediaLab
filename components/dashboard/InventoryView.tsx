@@ -55,7 +55,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
             sortableEquipment.sort((a, b) => {
                 let aValue = a[sortConfig.key] || '';
                 let bValue = b[sortConfig.key] || '';
-                
+
                 if (sortConfig.key === 'name') {
                     aValue = a.description || a.name;
                     bValue = b.description || b.name;

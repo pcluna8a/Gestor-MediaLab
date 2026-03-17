@@ -10,6 +10,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { CompleteProfileModal } from './components/CompleteProfileModal';
 import GlassCard from './components/GlassCard';
 import ErrorBoundary from './components/ErrorBoundary';
+import LandingView from './components/LandingView';
 
 const getGreetingName = (fullName: string): string => {
   if (!fullName) return 'Usuario';
@@ -32,6 +33,7 @@ const getGreetingName = (fullName: string): string => {
 };
 
 const MainApp: React.FC = () => {
+  const [showLanding, setShowLanding] = useState(true);
   const { currentUser, pendingProfileUser, logout } = useAuth();
   const {
     equipment,
@@ -130,6 +132,9 @@ const MainApp: React.FC = () => {
 
 
   if (!currentUser) {
+    if (showLanding) {
+      return <LandingView onEnter={() => setShowLanding(false)} />;
+    }
     return (
       <>
         {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}

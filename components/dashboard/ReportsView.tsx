@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { LoanRecord, Equipment } from '../../types';
+import { LoanRecord, Equipment, EquipmentStatus } from '../../types';
 import { DocumentReportIcon, SparklesIcon, DownloadIcon, ChartBarIcon } from '../Icons';
 import { generateLoanReportAnalysis } from '../../services/geminiService';
 import jsPDF from 'jspdf';
@@ -96,6 +96,34 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
             .slice(0, 5);
     }, [filteredLoans, equipment]);
 
+    // Inventory Status Data
+    const inventoryStatusData = useMemo(() => {
+        const counts = { Disponible: 0, Prestado: 0, Otros: 0 };
+        equipment.forEach(e => {
+            if (e.status === EquipmentStatus.AVAILABLE) counts.Disponible++;
+            else if (e.status === EquipmentStatus.ON_LOAN) counts.Prestado++;
+            else counts.Otros++;
+        });
+
+        return [
+            ...(counts.Disponible > 0 ? [{ name: 'Disponible', value: counts.Disponible }] : []),
+            ...(counts.Prestado > 0 ? [{ name: 'Prestado', value: counts.Prestado }] : []),
+            ...(counts.Otros > 0 ? [{ name: 'Otros', value: counts.Otros }] : []),
+        ];
+    }, [equipment]);
+
+    // Instructor Performance Data
+    const instructorPerformanceData = useMemo(() => {
+        const counts: Record<string, number> = {};
+        filteredLoans.filter(l => l.returnDate).forEach(l => {
+            const id = l.instructorId || 'Desconocido';
+            counts[id] = (counts[id] || 0) + 1;
+        });
+        return Object.entries(counts)
+            .map(([name, count]) => ({ name, préstamos: count }))
+            .sort((a, b) => b.préstamos - a.préstamos);
+    }, [filteredLoans]);
+
     const generatePDFReport = () => {
         const doc = new jsPDF();
         doc.setFontSize(18);
@@ -164,18 +192,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
 
     const handleForceEdit = async () => {
         if (!editingLoan || !currentUser?.isSuperAdmin) return;
-        
+
         const result = await registerReturn(
-            editingLoan.id, 
-            editingLoan.equipmentId, 
-            { 
-                 concept: editConcept, 
-                 status: editStatus, 
-                 photos: editingLoan.returnPhotos || [], 
-                 analysis: editingLoan.returnConditionAnalysis || '' 
+            editingLoan.id,
+            editingLoan.equipmentId,
+            {
+                concept: editConcept,
+                status: editStatus,
+                photos: editingLoan.returnPhotos || [],
+                analysis: editingLoan.returnConditionAnalysis || ''
             }
         );
-        
+
         if (result.success) {
             await logAuditAction('FORCE_EDIT_LOAN', currentUser.id, currentUser.name, editingLoan.id, {
                 oldStatus: editingLoan.returnStatus,
@@ -306,6 +334,73 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
                 </div>
             </div>
 
+            {/* Secondary Charts row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                {/* Inventory Status Pie Chart */}
+                <div className="bg-white/5 p-6 rounded-xl border border-white/10">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <ChartBarIcon className="w-5 h-5 text-blue-400" /> Estado del Inventario
+                    </h3>
+                    {inventoryStatusData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={250}>
+                            <PieChart>
+                                <Pie
+                                    data={inventoryStatusData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={50}
+                                    outerRadius={80}
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                    labelLine={false}
+                                >
+                                    {inventoryStatusData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.name === 'Disponible' ? '#39A900' : entry.name === 'Prestado' ? '#f59e0b' : '#3b82f6'} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: '#1F2937', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <p className="text-sm text-gray-500 italic text-center py-8">Sin datos de inventario.</p>
+                    )}
+                </div>
+
+                {/* Instructor Performance Bar Chart (Super Admin Only) */}
+                {currentUser?.isSuperAdmin ? (
+                    <div className="bg-white/5 p-6 rounded-xl border border-white/10">
+                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <ChartBarIcon className="w-5 h-5 text-orange-400" /> Rendimiento por Instructor
+                        </h3>
+                        {instructorPerformanceData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={250}>
+                                <BarChart data={instructorPerformanceData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
+                                    <XAxis type="number" tick={{ fill: '#9CA3AF', fontSize: 11 }} allowDecimals={false} />
+                                    <YAxis type="category" dataKey="name" tick={{ fill: '#9CA3AF', fontSize: 11 }} width={80} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1F2937', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
+                                        labelStyle={{ color: '#9CA3AF' }}
+                                    />
+                                    <Bar dataKey="préstamos" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <p className="text-sm text-gray-500 italic text-center py-8">No hay registros de préstamos cerrados.</p>
+                        )}
+                    </div>
+                ) : (
+                    <div className="bg-white/5 p-6 rounded-xl border border-white/10 flex flex-col items-center justify-center text-center opacity-50">
+                        <SparklesIcon className="w-8 h-8 text-gray-500 mb-2" />
+                        <p className="text-sm text-gray-400">Rendimiento de Instructores</p>
+                        <p className="text-xs text-gray-500 mt-1">Exclusivo para Super Admin</p>
+                    </div>
+                )}
+            </div>
+
             {/* Top Equipment + Actions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Top Borrowed */}
@@ -415,7 +510,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
                     <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-md text-red-200 text-xs">
                         <strong>Atención:</strong> Estás modificando un registro histórico cerrado. Esta acción quedará grabada en el log de auditoría.
                     </div>
-                    
+
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">Nuevo Estado Final</label>
                         <div className="grid grid-cols-3 gap-2">
@@ -426,14 +521,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
                                     className={`py-2 px-1 text-sm rounded border ${editStatus === status
                                         ? 'bg-orange-500 text-white border-orange-500'
                                         : 'bg-black/20 border-white/10 text-gray-400'
-                                    }`}
+                                        }`}
                                 >
                                     {status}
                                 </button>
                             ))}
                         </div>
                     </div>
-                    
+
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">Nuevo Concepto</label>
                         <textarea
@@ -443,7 +538,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
                             rows={3}
                         />
                     </div>
-                    
+
                     <button
                         onClick={handleForceEdit}
                         className="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-500 transition-colors mt-4"

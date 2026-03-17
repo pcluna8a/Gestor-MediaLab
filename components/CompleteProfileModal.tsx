@@ -5,7 +5,7 @@ import Spinner from './Spinner';
 
 export const CompleteProfileModal: React.FC = () => {
     const { pendingProfileUser, completeProfile, logout } = useAuth();
-    
+
     const [idInput, setIdInput] = useState('');
     const [category, setCategory] = useState<UserCategory | ''>('');
     const [loading, setLoading] = useState(false);
@@ -16,13 +16,13 @@ export const CompleteProfileModal: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        
+
         const cleanId = idInput.trim().replace(/[^0-9]/g, '');
         if (!cleanId || cleanId.length < 5) {
             setError("Por favor ingresa un número de documento válido.");
             return;
         }
-        
+
         if (!category) {
             setError("Por favor selecciona tu categoría Institucional.");
             return;
@@ -30,7 +30,7 @@ export const CompleteProfileModal: React.FC = () => {
 
         setLoading(true);
         const result = await completeProfile(cleanId, category as UserCategory);
-        
+
         if (!result.success) {
             setError(result.error || "Ocurrió un error al vincular tu perfil.");
         }

@@ -16,7 +16,7 @@ const SystemSettingsView: React.FC = () => {
             maintenanceMode: isMaintenance,
             termsAndConditions: terms
         });
-        
+
         if (result.success) {
             showToast("Ajustes del sistema guardados exitosamente", "success");
         } else {
@@ -50,9 +50,9 @@ const SystemSettingsView: React.FC = () => {
                     </p>
                     <label className="flex items-center cursor-pointer group">
                         <div className="relative">
-                            <input 
-                                type="checkbox" 
-                                className="sr-only" 
+                            <input
+                                type="checkbox"
+                                className="sr-only"
                                 checked={isMaintenance}
                                 onChange={() => setIsMaintenance(!isMaintenance)}
                             />
@@ -71,7 +71,7 @@ const SystemSettingsView: React.FC = () => {
                     <p className="text-sm text-gray-400 mb-4">
                         Este texto se le mostrará a los usuarios o instructores al momento de realizar el flujo de préstamo.
                     </p>
-                    <textarea 
+                    <textarea
                         value={terms}
                         onChange={(e) => setTerms(e.target.value)}
                         className="w-full h-48 p-4 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all resize-none text-sm font-mono"
@@ -80,7 +80,7 @@ const SystemSettingsView: React.FC = () => {
                 </div>
 
                 <div className="flex justify-end pt-4 border-t border-white/10">
-                    <button 
+                    <button
                         onClick={handleSave}
                         className="bg-sena-green text-white font-bold py-3 px-8 rounded-lg hover:shadow-[0_0_15px_rgba(57,169,0,0.4)] transition-all hover:scale-[1.02] active:scale-95"
                     >

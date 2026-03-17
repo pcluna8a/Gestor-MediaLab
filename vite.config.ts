@@ -42,6 +42,7 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          navigateFallback: '/index.html',
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

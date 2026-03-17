@@ -32,7 +32,7 @@ interface DataContextType {
     registerLoan: (loan: LoanRecord) => Promise<{ success: boolean; error?: string }>;
     registerReturn: (loanId: string, equipmentId: string, data: { concept: string, status: string, photos: string[], analysis: string }) => Promise<{ success: boolean; error?: string }>;
 
-    addUser: (user: User) => Promise<void>; 
+    addUser: (user: User) => Promise<void>;
     deleteUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
 }
 

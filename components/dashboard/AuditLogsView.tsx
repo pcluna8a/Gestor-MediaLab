@@ -15,7 +15,7 @@ const AuditLogsView: React.FC = () => {
             setLoading(false);
             return;
         }
-        
+
         const q = query(
             collection(db, 'audit_logs'),
             orderBy('timestamp', 'desc'),
@@ -34,7 +34,7 @@ const AuditLogsView: React.FC = () => {
         return () => unsub();
     }, []);
 
-    const filteredLogs = logs.filter(log => 
+    const filteredLogs = logs.filter(log =>
         log.actorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -48,7 +48,7 @@ const AuditLogsView: React.FC = () => {
     };
 
     const getActionLabel = (action: string) => {
-        switch(action) {
+        switch (action) {
             case 'DELETE_EQUIPMENT': return 'Eliminación de Equipo';
             case 'DELETE_USER': return 'Eliminación de Usuario';
             case 'FORCE_EDIT_LOAN': return 'Edición Forzada de Préstamo';
@@ -114,7 +114,7 @@ const AuditLogsView: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-white font-medium">
-                                                {log.actorName} <br/>
+                                                {log.actorName} <br />
                                                 <span className="text-[10px] text-gray-500 font-mono">{log.actorId}</span>
                                             </td>
                                             <td className="px-6 py-4 text-sm font-mono text-gray-400 cursor-pointer hover:text-white transition-colors" title="Copiar ID" onClick={() => navigator.clipboard.writeText(log.targetId)}>

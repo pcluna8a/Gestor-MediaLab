@@ -102,7 +102,7 @@ export const loginStudent = async (email: string, password: string) => {
                 return { success: false, error: `Error de autenticación: ${createError.message}` };
             }
         }
-        
+
         // Return only the Firebase User. Firestore document unification 
         // will be handled explicitly via completeUserProfile.
         return { success: true, user: userCredential.user };
@@ -134,15 +134,15 @@ export const completeUserProfile = async (
 
     try {
         const userRef = doc(db, COLL_USERS, id);
-        
+
         await runTransaction(db, async (transaction) => {
             const userSnap = await transaction.get(userRef);
-            
+
             if (userSnap.exists()) {
                 // User exists, merge data
                 const userData = userSnap.data() as User;
                 const updates: any = {};
-                
+
                 if (uid && !userData.uid) updates.uid = uid;
                 if (email && !userData.email) updates.email = email;
                 if (emailGoogle && !userData.emailGoogle) updates.emailGoogle = emailGoogle;
@@ -153,7 +153,7 @@ export const completeUserProfile = async (
                         updates.isSuperAdmin = true;
                     }
                 }
-                
+
                 if (Object.keys(updates).length > 0) {
                     transaction.update(userRef, updates);
                 }
@@ -169,7 +169,7 @@ export const completeUserProfile = async (
                 if (category === UserCategory.SUPER_ADMIN) newUser.isSuperAdmin = true;
                 if (email) newUser.email = email;
                 if (emailGoogle) newUser.emailGoogle = emailGoogle;
-                
+
                 transaction.set(userRef, newUser);
             }
         });

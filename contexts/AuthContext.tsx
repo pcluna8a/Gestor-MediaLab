@@ -107,12 +107,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleCompleteProfile = async (id: string, category: UserCategory) => {
         if (!pendingProfileUser) return { success: false, error: "No hay cuenta pendiente vinculada." };
-        
+
         const isGoogleProvider = pendingProfileUser.providerData.some(p => p.providerId === 'google.com');
         const email = isGoogleProvider ? undefined : pendingProfileUser.email || undefined;
         const emailGoogle = isGoogleProvider ? pendingProfileUser.email || undefined : undefined;
         const name = pendingProfileUser.displayName || 'Usuario Registrado';
-        
+
         const res = await completeUserProfile(id, pendingProfileUser.uid, category, email, emailGoogle, name);
         if (res.success && res.user) {
             setCurrentUser(res.user);
