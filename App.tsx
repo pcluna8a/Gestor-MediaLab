@@ -56,25 +56,7 @@ const MainApp: React.FC = () => {
     document.documentElement.classList.add('dark');
   }, []);
 
-  // Temporary effect to inject the SUPER ADMINISTRADOR user 
-  useEffect(() => {
-    const injectSuperAdmin = async () => {
-      try {
-        const superAdminUser: User = {
-          id: "999999999",
-          name: "SUPER ADMINISTRADOR",
-          emailGoogle: "paceluo@gmail.com",
-          category: "SUPER-ADMIN" as any,
-          role: Role.INSTRUCTOR_MEDIALAB
-        };
-        await addUser(superAdminUser);
-        console.log("SUPER-ADMIN injected correctly.");
-      } catch (e) {
-        console.error("Failed to inject SUPER-ADMIN", e);
-      }
-    };
-    injectSuperAdmin();
-  }, []);
+
 
   const handleNewLoan = async (loan: LoanRecord) => {
     const result = await registerLoan(loan);

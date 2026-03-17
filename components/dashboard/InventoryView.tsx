@@ -105,7 +105,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ equipment, onAddNewEquipm
             name: newItemName.toUpperCase(),
             type: newItemType,
             status: EquipmentStatus.AVAILABLE,
-            imageUrl: newItemImage || 'https://via.placeholder.com/150'
+            imageUrl: newItemImage || ''
         });
         setNewItemId('');
         setNewItemName('');

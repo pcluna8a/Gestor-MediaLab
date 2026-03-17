@@ -142,7 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendPasswordReset: handleResetPassword,
         completeProfile: handleCompleteProfile,
         logout,
-        isAdmin: currentUser?.role === Role.INSTRUCTOR_MEDIALAB,
+        isAdmin: currentUser?.isSuperAdmin === true,
         isInstructor: currentUser?.role === Role.INSTRUCTOR_MEDIALAB
     };
 

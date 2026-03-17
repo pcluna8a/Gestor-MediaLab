@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { CogIcon } from '../Icons';
+import { updateSystemSettings } from '../../services/firebaseService';
+import { useToast } from '../Toast';
 
 const SystemSettingsView: React.FC = () => {
     const { systemSettings, isOnline } = useData();
-    const { updateSystemSettings } = require('../../services/firebaseService');
-    const { useToast } = require('../Toast');
     const { showToast } = useToast();
 
     const [isMaintenance, setIsMaintenance] = useState(systemSettings?.maintenanceMode || false);

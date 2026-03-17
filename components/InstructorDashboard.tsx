@@ -64,6 +64,7 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                         <TabButton icon={<ClipboardListIcon className="w-5 h-5" />} text="Activos" isActive={activeTab === 'activeLoans'} onClick={() => setActiveTab('activeLoans')} />
                         <TabButton icon={<UserGroupIcon className="w-5 h-5" />} text="Usuarios" isActive={activeTab === 'manageUsers'} onClick={() => setActiveTab('manageUsers')} />
                         <TabButton icon={<WrenchIcon className="w-5 h-5" />} text="Inventario" isActive={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} />
+                        <TabButton icon={<DocumentReportIcon className="w-5 h-5" />} text="Reportes" isActive={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
                         {props.currentUser?.isSuperAdmin && (
                             <>
                                 <TabButton icon={<DocumentReportIcon className="w-5 h-5" />} text="Auditoría" isActive={activeTab === 'auditData'} onClick={() => setActiveTab('auditData')} />

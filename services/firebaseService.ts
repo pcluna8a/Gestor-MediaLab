@@ -28,12 +28,15 @@ const COLL_USERS = 'users';
 // Firestore maneja internamente la persistencia y el modo offline.
 
 // --- SEGURIDAD (HASHING) ---
-export const hashPassword = async (password: string): Promise<string> => {
-    const msgBuffer = new TextEncoder().encode(password);
+export const hashPassword = async (password: string, salt?: string): Promise<{ hash: string, salt: string }> => {
+    const useSalt = salt || Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+    const salted = useSalt + password;
+    const msgBuffer = new TextEncoder().encode(salted);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
+    return { hash: hashHex, salt: useSalt };
 };
 
 // --- AUTH HELPER ---
@@ -268,7 +271,9 @@ export const registerReturnInCloud = async (
 export const addUserToCloud = async (user: User) => {
     if (!db) return;
     if (user.role === Role.INSTRUCTOR_MEDIALAB && !user.passwordHash) {
-        user.passwordHash = await hashPassword(user.id);
+        const { hash, salt } = await hashPassword(user.id);
+        user.passwordHash = hash;
+        (user as any).passwordSalt = salt;
         user.forcePasswordChange = true;
     }
     try {

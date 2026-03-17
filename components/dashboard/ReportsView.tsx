@@ -2,6 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { LoanRecord, Equipment, EquipmentStatus } from '../../types';
 import { DocumentReportIcon, SparklesIcon, DownloadIcon, ChartBarIcon } from '../Icons';
 import { generateLoanReportAnalysis } from '../../services/geminiService';
+import { logAuditAction } from '../../services/firebaseService';
+import { useAuth } from '../../contexts/AuthContext';
+import { useData } from '../../contexts/DataContext';
+import { useToast } from '../Toast';
+import Modal from '../Modal';
 import jsPDF from 'jspdf';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
@@ -13,6 +18,10 @@ interface ReportsViewProps {
 const CHART_COLORS = ['#39A900', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
 
 const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
+    const { currentUser } = useAuth();
+    const { registerReturn } = useData();
+    const { showToast } = useToast();
+
     const [analysis, setAnalysis] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [dateFrom, setDateFrom] = useState('');
@@ -174,14 +183,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
         return `${(hours / 24).toFixed(1)} días`;
     };
 
-    const { currentUser } = require('../../contexts/AuthContext').useAuth();
-    const { registerReturn } = require('../../contexts/DataContext').useData();
     const [editingLoan, setEditingLoan] = useState<LoanRecord | null>(null);
     const [editStatus, setEditStatus] = useState('Bueno');
     const [editConcept, setEditConcept] = useState('');
-    const { useToast } = require('../Toast');
-    const { showToast } = useToast();
-    const { logAuditAction } = require('../../services/firebaseService');
 
     const openEditModal = (loan: LoanRecord) => {
         if (!currentUser?.isSuperAdmin) return;
@@ -218,7 +222,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
         setEditingLoan(null);
     };
 
-    const Modal = require('../Modal').default;
+
 
     return (
         <div className="space-y-6 animate-fade-in">
