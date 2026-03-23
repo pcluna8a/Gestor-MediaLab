@@ -1,9 +1,15 @@
-import React, { useRef, useLayoutEffect } from 'react';
+import React, { useRef, useLayoutEffect, useState, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ArrowRightIcon, CameraIcon, ChartBarIcon, ShieldCheckIcon } from './Icons';
 
 gsap.registerPlugin(ScrollTrigger);
+
+const DASHBOARD_SCREENSHOTS = [
+  '/dashboard_home.png',
+  '/dashboard_inventory.png',
+  '/dashboard_reports.png',
+];
 
 interface LandingViewProps {
   onEnter: () => void;
@@ -11,6 +17,14 @@ interface LandingViewProps {
 
 const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [currentScreenshot, setCurrentScreenshot] = useState(Math.floor(Math.random() * 3));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentScreenshot(prev => (prev + 1) % DASHBOARD_SCREENSHOTS.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
@@ -72,7 +86,7 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="nav-element flex items-center gap-4">
             <img src="/logoSena.png" onError={(e) => e.currentTarget.src = "https://www.sena.edu.co/Style%20Library/alayout/images/logoSena.png"} alt="SENA" className="h-10 w-10 drop-shadow-[0_0_10px_rgba(57,169,0,0.5)]" />
-            <span className="text-xl font-bold tracking-tight text-white">Media<span className="text-sena-green">Lab</span> Gestor</span>
+            <span className="text-xl font-bold tracking-tight text-white">Gestor de Préstamos <span className="text-sena-green">MediaLab</span></span>
           </div>
           <div className="nav-element">
             <button
@@ -88,9 +102,9 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       {/* Hero Section */}
       <section className="relative pt-40 pb-20 px-6 min-h-[90vh] flex flex-col items-center justify-center text-center">
         <div className="max-w-4xl mx-auto z-10">
-          <div className="hero-text inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sena-green/10 border border-sena-green/20 text-sena-green font-mono text-xs mb-8 uppercase tracking-widest">
-            <span className="w-2 h-2 rounded-full bg-sena-green animate-pulse"></span>
-            Sistema Operativo CIES
+          <div className="hero-text inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sena-green/10 border border-sena-green/20 text-sena-green font-mono text-[10px] sm:text-xs mb-8 tracking-widest text-center leading-relaxed">
+            <span className="w-2 h-2 rounded-full bg-sena-green animate-pulse flex-shrink-0"></span>
+            Centro de la Industria, la Empresa y los Servicios — CIES
           </div>
           <h1 className="hero-text text-5xl md:text-7xl font-extrabold text-white tracking-tighter mb-6 leading-tight">
             Instrumento de <br className="hidden md:block" />
@@ -106,12 +120,12 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
               onClick={onEnter}
               className="px-8 py-4 bg-sena-green text-white font-bold rounded-xl shadow-[0_0_20px_rgba(57,169,0,0.4)] hover:shadow-[0_0_30px_rgba(57,169,0,0.6)] hover:scale-105 transition-all text-lg flex items-center gap-3"
             >
-              Iniciar Operación <ArrowRightIcon className="w-5 h-5" />
+              Iniciar Gestión del Préstamo <ArrowRightIcon className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Hero Abstract Mockup/Visual */}
+        {/* Hero Dashboard Screenshots */}
         <div className="hero-mockup mt-20 w-full max-w-5xl mx-auto rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-sena-green to-transparent opacity-50"></div>
           <div className="flex gap-2 mb-4 px-2">
@@ -119,22 +133,30 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
             <div className="w-3 h-3 rounded-full bg-yellow-500/50"></div>
             <div className="w-3 h-3 rounded-full bg-green-500/50"></div>
           </div>
-          <div className="grid grid-cols-4 gap-4 h-[300px]">
-            <div className="col-span-1 border border-white/5 rounded-lg bg-black/40 p-4 flex flex-col gap-4">
-              <div className="w-full h-8 bg-white/5 rounded"></div>
-              <div className="w-3/4 h-4 bg-white/5 rounded"></div>
-              <div className="w-1/2 h-4 bg-white/5 rounded"></div>
-            </div>
-            <div className="col-span-3 border border-white/5 rounded-lg bg-black/40 p-4">
-              <div className="w-full h-10 border-b border-white/5 mb-4 pb-2 flex gap-4">
-                <div className="w-24 h-4 bg-white/10 rounded"></div>
-                <div className="w-24 h-4 bg-white/5 rounded"></div>
-              </div>
-              <div className="space-y-3">
-                <div className="w-full h-12 bg-sena-green/10 rounded border border-sena-green/20"></div>
-                <div className="w-full h-12 bg-white/5 rounded"></div>
-                <div className="w-full h-12 bg-white/5 rounded"></div>
-              </div>
+          <div className="relative w-full aspect-[16/9] rounded-lg overflow-hidden bg-black/40">
+            {DASHBOARD_SCREENSHOTS.map((src, idx) => (
+              <img
+                key={src}
+                src={src}
+                alt={`Vista del Dashboard ${idx + 1}`}
+                className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-1000 ${
+                  idx === currentScreenshot ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            ))}
+            {/* Navigation dots */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+              {DASHBOARD_SCREENSHOTS.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentScreenshot(idx)}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    idx === currentScreenshot
+                      ? 'bg-sena-green w-6 shadow-[0_0_6px_rgba(57,169,0,0.6)]'
+                      : 'bg-white/30 hover:bg-white/50'
+                  }`}
+                />
+              ))}
             </div>
           </div>
         </div>

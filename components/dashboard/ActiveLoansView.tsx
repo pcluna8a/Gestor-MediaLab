@@ -14,16 +14,76 @@ interface ActiveLoansViewProps {
     onReturn: (loanId: string, returnConcept: string, returnStatus: string, returnPhoto?: string[], returnAnalysis?: string) => void;
 }
 
+type SortKey = 'equipment' | 'user' | 'date';
+
 const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, users, onReturn }) => {
     const activeLoans = loans.filter(l => !l.returnDate).sort((a, b) => b.loanDate.getTime() - a.loanDate.getTime());
 
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 20;
-    const totalPages = Math.ceil(activeLoans.length / ITEMS_PER_PAGE);
-    const paginatedLoans = activeLoans.slice(
+
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Search filter
+    const filteredLoans = activeLoans.filter(loan => {
+        if (!searchTerm) return true;
+        const term = searchTerm.toLowerCase();
+        const eq = equipment.find(e => e.id === loan.equipmentId);
+        const usr = users.find(u => u.id === loan.borrowerId);
+        return (
+            (eq?.name || '').toLowerCase().includes(term) ||
+            (eq?.id || '').toLowerCase().includes(term) ||
+            (usr?.name || '').toLowerCase().includes(term) ||
+            (usr?.id || '').toLowerCase().includes(term)
+        );
+    });
+
+    // Sort
+    const sortedLoans = React.useMemo(() => {
+        const sortable = [...filteredLoans];
+        if (sortConfig) {
+            sortable.sort((a, b) => {
+                let aVal = '';
+                let bVal = '';
+                if (sortConfig.key === 'equipment') {
+                    aVal = equipment.find(e => e.id === a.equipmentId)?.name || a.equipmentId;
+                    bVal = equipment.find(e => e.id === b.equipmentId)?.name || b.equipmentId;
+                } else if (sortConfig.key === 'user') {
+                    aVal = users.find(u => u.id === a.borrowerId)?.name || a.borrowerId;
+                    bVal = users.find(u => u.id === b.borrowerId)?.name || b.borrowerId;
+                } else if (sortConfig.key === 'date') {
+                    return sortConfig.direction === 'asc'
+                        ? a.loanDate.getTime() - b.loanDate.getTime()
+                        : b.loanDate.getTime() - a.loanDate.getTime();
+                }
+                const cmp = aVal.localeCompare(bVal);
+                return sortConfig.direction === 'asc' ? cmp : -cmp;
+            });
+        }
+        return sortable;
+    }, [filteredLoans, sortConfig, equipment, users]);
+
+    const totalPages = Math.ceil(sortedLoans.length / ITEMS_PER_PAGE);
+    const paginatedLoans = sortedLoans.slice(
         (currentPage - 1) * ITEMS_PER_PAGE,
         currentPage * ITEMS_PER_PAGE
     );
+
+    const handleSort = (key: SortKey) => {
+        setSortConfig(prev => {
+            if (prev?.key === key) {
+                return prev.direction === 'asc' ? { key, direction: 'desc' } : null;
+            }
+            return { key, direction: 'asc' };
+        });
+        setCurrentPage(1);
+    };
+
+    const getSortIndicator = (key: SortKey) => {
+        if (sortConfig?.key !== key) return ' ↕';
+        return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
+    };
 
     const [selectedLoan, setSelectedLoan] = useState<LoanRecord | null>(null);
     const [returnConcept, setReturnConcept] = useState('');
@@ -61,29 +121,40 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <h2 className="text-2xl font-bold text-sena-dark dark:text-white">Préstamos Activos</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h2 className="text-2xl font-bold text-white">Préstamos Activos</h2>
+                <div className="relative max-w-xs w-full">
+                    <input
+                        type="text"
+                        placeholder="Buscar equipo o usuario..."
+                        value={searchTerm}
+                        onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        className="w-full pl-4 pr-4 py-2.5 bg-black/20 border border-white/10 rounded-lg text-white text-sm placeholder-gray-600 focus:border-sena-green outline-none transition-all"
+                    />
+                </div>
+            </div>
 
             {/* Modal de Devolución */}
             <Modal isOpen={!!selectedLoan} onClose={() => setSelectedLoan(null)} title="Registrar Devolución">
                 <div className="space-y-4">
                     {selectedLoan && (
-                        <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm">
-                            <p><span className="font-bold">Equipo:</span> {equipment.find(e => e.id === selectedLoan.equipmentId)?.name}</p>
-                            <p><span className="font-bold">Usuario:</span> {users.find(u => u.id === selectedLoan.borrowerId)?.name}</p>
+                        <div className="bg-white/5 border border-white/10 p-3 rounded-lg text-sm text-gray-300">
+                            <p><span className="font-bold text-white">Equipo:</span> {equipment.find(e => e.id === selectedLoan.equipmentId)?.name}</p>
+                            <p><span className="font-bold text-white">Usuario:</span> {users.find(u => u.id === selectedLoan.borrowerId)?.name}</p>
                         </div>
                     )}
 
                     {/* Selección de Estado Cualitativo */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estado Actual (Devolución)</label>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Estado Actual (Devolución)</label>
                         <div className="grid grid-cols-3 gap-2">
                             {['Excelente', 'Bueno', 'Aceptable', 'Regular', 'Malo'].map(status => (
                                 <button
                                     key={status}
                                     onClick={() => setReturnStatus(status)}
-                                    className={`py-2 px-1 text-sm rounded border ${returnStatus === status
-                                        ? 'bg-sena-green text-white border-sena-green'
-                                        : 'bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500'
+                                    className={`py-2 px-1 text-sm rounded border transition-all ${returnStatus === status
+                                        ? 'bg-sena-green text-white border-sena-green shadow-[0_0_10px_rgba(57,169,0,0.3)]'
+                                        : 'bg-black/20 border-white/10 text-gray-400 hover:border-white/20'
                                         }`}
                                 >
                                     {status}
@@ -94,20 +165,20 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
 
                     {/* Evidencia Fotográfica (Opcional) */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Verificación Visual (Opcional)</label>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Verificación Visual (Opcional)</label>
                         {returnPhotos.length > 0 ? (
                             <div className="relative">
-                                <img src={returnPhotos[0]} alt="Evidencia" className="w-full h-48 object-cover rounded-lg" />
+                                <img src={returnPhotos[0]} alt="Evidencia" className="w-full h-48 object-cover rounded-lg border border-white/10" />
                                 <button
                                     onClick={() => setReturnPhotos([])}
-                                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 text-xs"
+                                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 text-xs hover:bg-red-400 transition-colors"
                                 >
                                     ✕
                                 </button>
-                                {isAnalyzing && <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white"><Spinner color="white" /> Analizando...</div>}
+                                {isAnalyzing && <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center text-white rounded-lg"><Spinner color="white" /> Analizando...</div>}
                                 {!isAnalyzing && aiAnalysis && (
-                                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 text-xs rounded border border-blue-100 dark:border-blue-800 text-gray-700 dark:text-gray-300">
-                                        <strong>IA Analysis:</strong> {aiAnalysis}
+                                    <div className="mt-2 p-2 bg-blue-500/10 text-xs rounded border border-blue-500/20 text-gray-300">
+                                        <strong className="text-blue-400">IA Analysis:</strong> {aiAnalysis}
                                     </div>
                                 )}
                             </div>
@@ -115,7 +186,7 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                             !isCameraOpen ? (
                                 <button
                                     onClick={() => setIsCameraOpen(true)}
-                                    className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center gap-2 text-gray-500 hover:border-sena-green hover:text-sena-green transition-colors"
+                                    className="w-full py-3 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center gap-2 text-gray-500 hover:border-sena-green/50 hover:text-sena-green transition-colors"
                                 >
                                     <CameraIcon className="w-5 h-5" /> Agregar Foto Evidencia (Opcional)
                                 </button>
@@ -131,11 +202,11 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
 
                     {/* Concepto Texto */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observaciones / Concepto Final</label>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Observaciones / Concepto Final</label>
                         <textarea
                             value={returnConcept}
                             onChange={e => setReturnConcept(e.target.value)}
-                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-white"
+                            className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green outline-none transition-all"
                             rows={3}
                             placeholder="Observaciones adicionales sobre la devolución..."
                         />
@@ -143,7 +214,7 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
 
                     <button
                         onClick={submitReturn}
-                        className="w-full bg-sena-green text-white font-bold py-3 rounded-lg hover:bg-opacity-90 transition-colors"
+                        className="w-full bg-sena-green text-white font-bold py-3 rounded-xl hover:shadow-[0_0_20px_rgba(57,169,0,0.4)] hover:scale-[1.02] active:scale-95 transition-all"
                     >
                         Confirmar Devolución
                     </button>
@@ -151,47 +222,68 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
             </Modal>
 
             {/* Tabla de Préstamos */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
+            <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/10 text-left">
+                    <thead className="bg-black/20 sticky top-0 backdrop-blur-md">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Equipo</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Usuario</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fecha Préstamo</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acción</th>
+                            <th
+                                onClick={() => handleSort('equipment')}
+                                className="px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors select-none"
+                            >
+                                Equipo{getSortIndicator('equipment')}
+                            </th>
+                            <th
+                                onClick={() => handleSort('user')}
+                                className="px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors select-none"
+                            >
+                                Usuario{getSortIndicator('user')}
+                            </th>
+                            <th
+                                onClick={() => handleSort('date')}
+                                className="px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors select-none"
+                            >
+                                Fecha Préstamo{getSortIndicator('date')}
+                            </th>
+                            <th className="px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Acción</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {activeLoans.length === 0 ? (
+                    <tbody className="divide-y divide-white/5">
+                        {sortedLoans.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="px-6 py-4 text-center text-gray-500">No hay préstamos activos.</td>
+                                <td colSpan={4} className="px-6 py-8 text-center text-gray-500 italic">No hay préstamos activos.</td>
                             </tr>
                         ) : (
                             paginatedLoans.map((loan) => {
                                 const eq = equipment.find(e => e.id === loan.equipmentId);
                                 const usr = users.find(u => u.id === loan.borrowerId);
                                 return (
-                                    <tr key={loan.id}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white flex items-center gap-3">
+                                    <tr key={loan.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white flex items-center gap-3">
                                             {eq ? (
                                                 <>
-                                                    <img src={eq.imageUrl} alt="" className="w-8 h-8 rounded object-cover" />
+                                                    <img src={eq.imageUrl} alt="" className="w-8 h-8 rounded object-cover border border-white/10" />
                                                     <div>
                                                         <div className="font-bold text-xs leading-tight uppercase">{eq.description || eq.name}</div>
-                                                        <div className="text-[10px] text-gray-500 mt-1">ID: {eq.id}</div>
+                                                        <div className="text-[10px] text-gray-500 mt-1 font-mono">ID: {eq.id}</div>
                                                     </div>
                                                 </>
                                             ) : 'Equipo Desconocido'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-bold text-gray-900 dark:text-white uppercase">
+                                            <div className="text-sm font-bold text-white uppercase">
                                                 {usr ? (usr.name !== 'Usuario' ? usr.name : 'Usuario Registrado') : 'Usuario Desconocido'}
                                             </div>
                                             <div className="text-[10px] text-gray-500 font-mono mt-1">ID: {loan.borrowerId}</div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{loan.loanDate.toLocaleDateString()} {loan.loanDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{loan.loanDate.toLocaleDateString()} {loan.loanDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <button onClick={() => openReturnModal(loan)} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-bold" aria-label={`Registrar devolución de ${eq?.name || loan.equipmentId}`}>Registrar Devolución</button>
+                                            <button
+                                                onClick={() => openReturnModal(loan)}
+                                                className="text-sena-green hover:text-green-300 font-bold text-xs uppercase tracking-wider transition-colors"
+                                                aria-label={`Registrar devolución de ${eq?.name || loan.equipmentId}`}
+                                            >
+                                                Registrar Devolución
+                                            </button>
                                         </td>
                                     </tr>
                                 );
@@ -204,7 +296,7 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
-                totalItems={activeLoans.length}
+                totalItems={sortedLoans.length}
                 itemsPerPage={ITEMS_PER_PAGE}
             />
         </div>

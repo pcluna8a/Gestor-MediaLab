@@ -28,11 +28,10 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
                 (e.description || '').toLowerCase().includes(term)
             );
         });
-    // ... (omitting eligibleUsers for brevity if possible, but replace_file_content needs exact match)
-    // Filter users by category and search term
+
     const eligibleUsers = users
         .filter(u => {
-            if (!selectedCategory) return true; // Default behavior: show all users
+            if (!selectedCategory) return true;
             if (selectedCategory === 'INSTRUCTOR-MEDIALAB') return u.role === Role.INSTRUCTOR_MEDIALAB;
             return u.role === Role.USUARIO_MEDIALAB && u.category === selectedCategory;
         })
@@ -62,20 +61,20 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
     };
 
     return (
-        <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md animate-fade-in">
-            <h2 className="text-2xl font-bold text-sena-dark dark:text-white mb-6">Registrar Nuevo Préstamo (Manual)</h2>
+        <div className="max-w-2xl mx-auto bg-white/5 backdrop-blur-md p-8 rounded-2xl border border-white/10 shadow-2xl animate-fade-in">
+            <h2 className="text-2xl font-bold text-white mb-6">Registrar Nuevo Préstamo <span className="text-[10px] uppercase tracking-widest text-gray-500 font-mono ml-2">Manual</span></h2>
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 mt-2 uppercase tracking-wide">USUARIO</label>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-2 mt-2 uppercase tracking-widest">Usuario</label>
 
                     {/* Category Filter */}
                     <select
                         value={selectedCategory}
                         onChange={(e) => {
                             setSelectedCategory(e.target.value);
-                            setSelectedUser(''); // Reset selection when filter changes
+                            setSelectedUser('');
                         }}
-                        className="w-full mb-3 p-3 bg-gray-50 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-sena-green"
+                        className="w-full mb-3 p-3 bg-black/20 border border-white/10 rounded-lg text-white focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all"
                     >
                         <option value="">Todos los Usuarios</option>
                         <option value="APRENDIZ">Usuario / Aprendiz</option>
@@ -87,57 +86,56 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
                     {/* Search Filter input */}
                     <div className="relative mb-2">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <SearchIcon className="h-5 w-5 text-gray-400" />
+                            <SearchIcon className="h-5 w-5 text-gray-500" />
                         </div>
                         <input
                             type="text"
                             placeholder="Buscar por Nombre o Documento..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 p-2 bg-gray-50 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-sena-green focus:border-transparent"
+                            className="w-full pl-10 p-2.5 bg-black/20 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all"
                         />
                     </div>
 
                     <select
                         value={selectedUser}
                         onChange={(e) => setSelectedUser(e.target.value)}
-                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                        className="w-full p-3 bg-black/20 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none transition-all"
                         required
-                        size={5} // Show multiple options to make selection easier after filtering
+                        size={5}
                     >
                         {eligibleUsers.length === 0 ? (
                             <option value="" disabled>No se encontraron usuarios</option>
                         ) : (
-                            // Add a default option if no user is selected yet, but only if not searching or if needed
                             !selectedUser && <option value="">Seleccionar Usuario...</option>
                         )}
                         {eligibleUsers.map(u => (
                             <option key={u.id} value={u.id}>{u.name} - {u.id}</option>
                         ))}
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-[10px] text-gray-500 mt-1 font-mono uppercase tracking-wider">
                         {eligibleUsers.length} usuario(s) encontrado(s).
                     </p>
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 mt-4 uppercase tracking-wide">Equipo Disponible</label>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-2 mt-4 uppercase tracking-widest">Equipo Disponible</label>
                     <div className="relative mb-2">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <SearchIcon className="h-5 w-5 text-gray-400" />
+                            <SearchIcon className="h-5 w-5 text-gray-500" />
                         </div>
                         <input
                             type="text"
                             placeholder="Buscar por Código, Nombre o Descripción..."
                             value={equipmentSearchTerm}
                             onChange={(e) => setEquipmentSearchTerm(e.target.value)}
-                            className="w-full pl-10 p-2 bg-gray-50 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-sena-green focus:border-transparent"
+                            className="w-full pl-10 p-2.5 bg-black/20 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all"
                         />
                     </div>
                     <select
                         value={selectedEquipment}
                         onChange={(e) => setSelectedEquipment(e.target.value)}
-                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                        className="w-full p-3 bg-black/20 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none transition-all"
                         required
                         size={5}
                     >
@@ -150,29 +148,29 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
                             <option key={e.id} value={e.id}>{e.name || e.id} - {e.id}</option>
                         ))}
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-[10px] text-gray-500 mt-1 font-mono uppercase tracking-wider">
                         {availableEquipment.length} equipo(s) disponible(s).
                     </p>
 
                     {/* Equipment Preview Card */}
                     {selectedEquipment && (
-                        <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex flex-col sm:flex-row items-center gap-4 animate-fade-in">
+                        <div className="mt-4 p-4 bg-white/5 border border-white/10 rounded-xl flex flex-col sm:flex-row items-center gap-4 animate-fade-in">
                             {(() => {
                                 const eq = availableEquipment.find(e => e.id === selectedEquipment);
                                 if (!eq) return null;
                                 return (
                                     <>
-                                        <div className="w-24 h-24 flex-shrink-0 bg-white dark:bg-gray-700 rounded-md overflow-hidden flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                                        <div className="w-24 h-24 flex-shrink-0 bg-black/40 rounded-lg overflow-hidden flex items-center justify-center border border-white/10">
                                             {eq.imageUrl ? (
                                                 <img src={eq.imageUrl} alt={eq.name} className="w-full h-full object-cover" />
                                             ) : (
-                                                <span className="text-gray-400 text-xs">Sin imagen</span>
+                                                <span className="text-gray-500 text-xs">Sin imagen</span>
                                             )}
                                         </div>
                                         <div className="flex-1 text-center sm:text-left">
-                                            <h4 className="text-lg font-bold text-gray-800 dark:text-white capitalize">{eq.name}</h4>
+                                            <h4 className="text-lg font-bold text-white capitalize">{eq.name}</h4>
                                             <p className="text-sm text-sena-green font-semibold uppercase tracking-wide">{eq.type}</p>
-                                            <p className="text-xs text-gray-500 mt-1">ID: {eq.id}</p>
+                                            <p className="text-[10px] text-gray-500 mt-1 font-mono">ID: {eq.id}</p>
                                         </div>
                                     </>
                                 );
@@ -181,7 +179,7 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
                     )}
                 </div>
 
-                <button type="submit" className="w-full bg-sena-green text-white font-bold py-3 rounded-lg hover:bg-opacity-90 transition-colors">
+                <button type="submit" className="w-full bg-sena-green text-white font-bold py-3 rounded-xl hover:shadow-[0_0_20px_rgba(57,169,0,0.4)] hover:scale-[1.02] active:scale-95 transition-all">
                     Registrar Préstamo
                 </button>
             </form>
