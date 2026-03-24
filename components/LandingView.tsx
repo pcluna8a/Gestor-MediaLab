@@ -76,17 +76,17 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
   }, []);
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#050510] text-gray-200 overflow-x-hidden selection:bg-sena-green selection:text-white font-sans">
+    <div ref={containerRef} className="min-h-screen bg-sena-blue text-gray-200 overflow-x-hidden selection:bg-sena-green selection:text-white font-sans">
       {/* Background Gradients */}
       <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] bg-sena-green/10 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
 
       {/* Navbar */}
-      <nav className="fixed w-full z-50 top-0 transition-all backdrop-blur-md bg-[#050510]/60 border-b border-white/5">
+      <nav className="fixed w-full z-50 top-0 transition-all backdrop-blur-md bg-sena-blue/80 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="nav-element flex items-center gap-4">
             <img src="/logoSena.png" onError={(e) => e.currentTarget.src = "https://www.sena.edu.co/Style%20Library/alayout/images/logoSena.png"} alt="SENA" className="h-10 w-10 drop-shadow-[0_0_10px_rgba(57,169,0,0.5)]" />
-            <span className="text-xl font-bold tracking-tight text-white">Gestor de Préstamos <span className="text-sena-green">MediaLab</span></span>
+            <span className="text-xl font-bold tracking-tight text-white">Gestor de Préstamos Media<span className="text-sena-green">Lab</span></span>
           </div>
           <div className="nav-element">
             <button
@@ -139,9 +139,8 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
                 key={src}
                 src={src}
                 alt={`Vista del Dashboard ${idx + 1}`}
-                className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-1000 ${
-                  idx === currentScreenshot ? 'opacity-100' : 'opacity-0'
-                }`}
+                className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-1000 ${idx === currentScreenshot ? 'opacity-100' : 'opacity-0'
+                  }`}
               />
             ))}
             {/* Navigation dots */}
@@ -150,11 +149,10 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
                 <button
                   key={idx}
                   onClick={() => setCurrentScreenshot(idx)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    idx === currentScreenshot
+                  className={`w-2 h-2 rounded-full transition-all ${idx === currentScreenshot
                       ? 'bg-sena-green w-6 shadow-[0_0_6px_rgba(57,169,0,0.6)]'
                       : 'bg-white/30 hover:bg-white/50'
-                  }`}
+                    }`}
                 />
               ))}
             </div>
@@ -210,7 +208,7 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 bg-[#020205] py-12 px-6">
+      <footer className="border-t border-white/10 bg-[#001e30] py-12 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3">
             <img src="/logoSena.png" onError={(e) => e.currentTarget.src = "https://www.sena.edu.co/Style%20Library/alayout/images/logoSena.png"} alt="SENA" className="h-8 w-8 grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all" />

@@ -88,7 +88,8 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
 
     // Filtered and Sorted Users
-    const allowedUsers = currentUser?.isSuperAdmin
+    const isSuperAdminUser = currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN';
+    const allowedUsers = isSuperAdminUser
         ? users
         : users.filter(u => u.role !== Role.INSTRUCTOR_MEDIALAB);
 
@@ -188,7 +189,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                                 <label className="block text-xs font-medium text-gray-400 mb-1">Rol</label>
                                 <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as Role)} className="w-full p-3 bg-black/20 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none appearance-none">
                                     <option value={Role.USUARIO_MEDIALAB} className="bg-sena-dark">Usuario</option>
-                                    {currentUser?.isSuperAdmin && (
+                                    {(currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN') && (
                                         <option value={Role.INSTRUCTOR_MEDIALAB} className="bg-sena-dark">Instructor</option>
                                     )}
                                 </select>
@@ -347,7 +348,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                         <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green focus:ring-1 focus:ring-sena-green outline-none transition-all" />
                     </div>
 
-                    {currentUser?.isSuperAdmin && (
+                    {(currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN') && (
                         <div>
                             <label className="block text-xs font-medium text-gray-400 mb-1">Rol</label>
                             <select value={editRole} onChange={e => setEditRole(e.target.value as Role)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none appearance-none">

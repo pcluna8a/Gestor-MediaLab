@@ -128,7 +128,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const deleteEquipment = async (id: string) => {
-        if (currentUser?.isSuperAdmin) {
+        if (currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN') {
             return await deleteEquipmentInCloud(id, currentUser.id, currentUser.name);
         }
         return await deleteEquipmentInCloud(id);
@@ -139,7 +139,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const registerLoan = async (loan: LoanRecord) => {
-        if (systemSettings?.maintenanceMode && !currentUser?.isSuperAdmin) {
+        if (systemSettings?.maintenanceMode && !currentUser?.isSuperAdmin && currentUser?.category !== 'SUPER-ADMIN') {
             return { success: false, error: "El sistema de préstamos está temporalmente deshabilitado." };
         }
         return await registerNewLoanInCloud(loan);
@@ -154,7 +154,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const deleteUser = async (userId: string) => {
-        if (!currentUser?.isSuperAdmin) {
+        if (!currentUser?.isSuperAdmin && currentUser?.category !== 'SUPER-ADMIN') {
             return { success: false, error: "No tienes permisos para eliminar usuarios." };
         }
         // Assuming deleteUserInCloud is imported from firebaseService

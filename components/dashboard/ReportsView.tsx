@@ -188,14 +188,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
     const [editConcept, setEditConcept] = useState('');
 
     const openEditModal = (loan: LoanRecord) => {
-        if (!currentUser?.isSuperAdmin) return;
+        if (!currentUser?.isSuperAdmin && currentUser?.category !== 'SUPER-ADMIN') return;
         setEditingLoan(loan);
         setEditStatus(loan.returnStatus || 'Bueno');
         setEditConcept(loan.returnConcept || '');
     };
 
     const handleForceEdit = async () => {
-        if (!editingLoan || !currentUser?.isSuperAdmin) return;
+        if (!editingLoan || (!currentUser?.isSuperAdmin && currentUser?.category !== 'SUPER-ADMIN')) return;
 
         const result = await registerReturn(
             editingLoan.id,
@@ -374,7 +374,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
                 </div>
 
                 {/* Instructor Performance Bar Chart (Super Admin Only) */}
-                {currentUser?.isSuperAdmin ? (
+                {(currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN') ? (
                     <div className="bg-white/5 p-6 rounded-xl border border-white/10">
                         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                             <ChartBarIcon className="w-5 h-5 text-orange-400" /> Rendimiento por Instructor
@@ -467,7 +467,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ loans, equipment = [] }) => {
 
             {/* AI Analysis Result */}
             {/* Detailed Closed Loans Table for Super Admins */}
-            {currentUser?.isSuperAdmin && (
+            {(currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN') && (
                 <div className="bg-white/5 p-6 rounded-xl border border-white/10 mt-8">
                     <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2">
                         <DocumentReportIcon className="w-5 h-5 text-red-400" /> Préstamos Cerrados (Solo Super Admin)

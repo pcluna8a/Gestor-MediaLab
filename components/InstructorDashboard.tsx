@@ -65,7 +65,7 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                         <TabButton icon={<UserGroupIcon className="w-5 h-5" />} text="Usuarios" isActive={activeTab === 'manageUsers'} onClick={() => setActiveTab('manageUsers')} />
                         <TabButton icon={<WrenchIcon className="w-5 h-5" />} text="Inventario" isActive={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} />
                         <TabButton icon={<DocumentReportIcon className="w-5 h-5" />} text="Reportes" isActive={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
-                        {props.currentUser?.isSuperAdmin && (
+                        {(props.currentUser?.isSuperAdmin || props.currentUser?.category === 'SUPER-ADMIN') && (
                             <>
                                 <TabButton icon={<DocumentReportIcon className="w-5 h-5" />} text="Auditoría" isActive={activeTab === 'auditData'} onClick={() => setActiveTab('auditData')} />
                                 <TabButton icon={<CogIcon className="w-5 h-5" />} text="Ajustes" isActive={activeTab === 'systemSettings'} onClick={() => setActiveTab('systemSettings')} />
@@ -100,8 +100,8 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                         />
                     )}
                     {activeTab === 'reports' && <ReportsView loans={props.loans} equipment={props.equipment} />}
-                    {activeTab === 'auditData' && props.currentUser?.isSuperAdmin && <AuditLogsView />}
-                    {activeTab === 'systemSettings' && props.currentUser?.isSuperAdmin && <SystemSettingsView />}
+                    {activeTab === 'auditData' && (props.currentUser?.isSuperAdmin || props.currentUser?.category === 'SUPER-ADMIN') && <AuditLogsView />}
+                    {activeTab === 'systemSettings' && (props.currentUser?.isSuperAdmin || props.currentUser?.category === 'SUPER-ADMIN') && <SystemSettingsView />}
                 </Suspense>
             </GlassCard>
         </div>

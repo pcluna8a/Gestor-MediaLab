@@ -125,6 +125,81 @@ export const logoutUser = async () => {
     }
 };
 
+// --- VALIDACIÓN ANTI-DUPLICIDAD DE USUARIOS ---
+export interface DuplicateCheckResult {
+    isDuplicate: boolean;
+    conflicts: string[];
+}
+
+export const checkDuplicateUser = async (
+    id: string,
+    email?: string,
+    emailGoogle?: string,
+    name?: string,
+): Promise<DuplicateCheckResult> => {
+    if (!db) return { isDuplicate: false, conflicts: [] };
+
+    const conflicts: string[] = [];
+
+    try {
+        // 1. Check by Document ID (primary key)
+        const docSnap = await getDoc(doc(db, COLL_USERS, id));
+        if (docSnap.exists()) {
+            conflicts.push(`El documento de identidad "${id}" ya está registrado en el sistema.`);
+        }
+
+        // 2. Check by institutional email
+        if (email) {
+            const emailQuery = query(
+                collection(db, COLL_USERS),
+                where('email', '==', email)
+            );
+            const emailSnap = await getDocs(emailQuery);
+            if (!emailSnap.empty) {
+                const existingId = emailSnap.docs[0].id;
+                if (existingId !== id) {
+                    conflicts.push(`El correo institucional "${email}" ya está asociado al usuario con ID: ${existingId}.`);
+                }
+            }
+        }
+
+        // 3. Check by Google email
+        if (emailGoogle) {
+            const googleQuery = query(
+                collection(db, COLL_USERS),
+                where('emailGoogle', '==', emailGoogle)
+            );
+            const googleSnap = await getDocs(googleQuery);
+            if (!googleSnap.empty) {
+                const existingId = googleSnap.docs[0].id;
+                if (existingId !== id) {
+                    conflicts.push(`El correo Google "${emailGoogle}" ya está asociado al usuario con ID: ${existingId}.`);
+                }
+            }
+        }
+
+        // 4. Check by exact name match
+        if (name && name !== 'Usuario Registrado' && name !== 'Usuario') {
+            const nameQuery = query(
+                collection(db, COLL_USERS),
+                where('name', '==', name)
+            );
+            const nameSnap = await getDocs(nameQuery);
+            if (!nameSnap.empty) {
+                const existingId = nameSnap.docs[0].id;
+                if (existingId !== id) {
+                    conflicts.push(`El nombre "${name}" ya está registrado bajo el ID: ${existingId}. Si eres la misma persona, usa el mismo ID.`);
+                }
+            }
+        }
+
+        return { isDuplicate: conflicts.length > 0, conflicts };
+    } catch (error: any) {
+        console.error("Duplicate check error:", error);
+        return { isDuplicate: false, conflicts: [] }; // Fail open to not block access
+    }
+};
+
 export const completeUserProfile = async (
     id: string,
     uid: string,
@@ -137,6 +212,19 @@ export const completeUserProfile = async (
 
     try {
         const userRef = doc(db, COLL_USERS, id);
+
+        // --- Anti-Duplicity Check (before creating new users) ---
+        const existingSnap = await getDoc(userRef);
+        if (!existingSnap.exists()) {
+            // Only run full duplicate check when creating a NEW user
+            const duplicateCheck = await checkDuplicateUser(id, email, emailGoogle, name);
+            if (duplicateCheck.isDuplicate) {
+                return {
+                    success: false,
+                    error: `⚠️ Registro duplicado detectado:\n${duplicateCheck.conflicts.join('\n')}`
+                };
+            }
+        }
 
         await runTransaction(db, async (transaction) => {
             const userSnap = await transaction.get(userRef);
