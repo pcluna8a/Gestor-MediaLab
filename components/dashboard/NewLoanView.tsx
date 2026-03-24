@@ -79,7 +79,7 @@ const NewLoanView: React.FC<NewLoanViewProps> = ({ users, equipment, onNewLoan, 
                         <option value="">Todos los Usuarios</option>
                         <option value="APRENDIZ">Usuario / Aprendiz</option>
                         <option value="ADMINISTRATIVO">Usuario / Administrativo</option>
-                        <option value="INSTRUCTOR">Usuario / Instructor</option>
+                        <option value="INSTRUCTOR-SENA">Usuario / Instructor SENA</option>
                         <option value="INSTRUCTOR-MEDIALAB">Instructor-MediaLab</option>
                     </select>
 

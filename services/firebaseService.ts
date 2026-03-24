@@ -239,8 +239,10 @@ export const completeUserProfile = async (
                 if (emailGoogle && !userData.emailGoogle) updates.emailGoogle = emailGoogle;
                 if (category && userData.category !== category) {
                     updates.category = category;
-                    if (category === UserCategory.SUPER_ADMIN) {
+                    if (category === UserCategory.SUPER_ADMIN || category === UserCategory.ADMIN) {
                         updates.role = Role.INSTRUCTOR_MEDIALAB;
+                    }
+                    if (category === UserCategory.SUPER_ADMIN) {
                         updates.isSuperAdmin = true;
                     }
                 }
@@ -250,11 +252,12 @@ export const completeUserProfile = async (
                 }
             } else {
                 // User does not exist, create new unified record
+                const isInstructorCategory = category === UserCategory.SUPER_ADMIN || category === UserCategory.ADMIN;
                 const newUser: User = {
                     id,
                     uid,
                     name,
-                    role: category === UserCategory.SUPER_ADMIN ? Role.INSTRUCTOR_MEDIALAB : Role.USUARIO_MEDIALAB,
+                    role: isInstructorCategory ? Role.INSTRUCTOR_MEDIALAB : Role.USUARIO_MEDIALAB,
                     category: category as any,
                 };
                 if (category === UserCategory.SUPER_ADMIN) newUser.isSuperAdmin = true;

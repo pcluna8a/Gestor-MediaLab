@@ -5,10 +5,13 @@ export enum Role {
 }
 
 export enum UserCategory {
-  APRENDIZ = 'APRENDIZ',
-  ADMINISTRATIVO = 'ADMINISTRATIVO',
-  INSTRUCTOR = 'INSTRUCTOR',
+  // Categories for INSTRUCTOR-MEDIALAB role
   SUPER_ADMIN = 'SUPER-ADMIN',
+  ADMIN = 'ADMIN',
+  // Categories for USUARIO-MEDIALAB role
+  APRENDIZ = 'APRENDIZ',
+  INSTRUCTOR_SENA = 'INSTRUCTOR-SENA',
+  ADMINISTRATIVO = 'ADMINISTRATIVO',
 }
 
 export interface User {

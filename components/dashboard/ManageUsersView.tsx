@@ -27,6 +27,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
     const [editName, setEditName] = useState('');
     const [editEmail, setEditEmail] = useState('');
     const [editRole, setEditRole] = useState<Role>(Role.USUARIO_MEDIALAB);
+    const [editCategory, setEditCategory] = useState<UserCategory>(UserCategory.APRENDIZ);
     const [editPhoto, setEditPhoto] = useState('');
 
     const handleAddUser = (e: React.FormEvent) => {
@@ -67,6 +68,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
         setEditName(user.name);
         setEditEmail(user.email || '');
         setEditRole(user.role);
+        setEditCategory(user.category || UserCategory.APRENDIZ);
         setEditPhoto(user.photoURL || '');
     };
 
@@ -77,6 +79,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                 name: editName.toUpperCase(),
                 email: editEmail,
                 role: editRole,
+                category: editCategory,
                 photoURL: editPhoto || undefined
             });
             setEditingUser(null);
@@ -89,7 +92,8 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
 
     // Filtered and Sorted Users
     const isSuperAdminUser = currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN';
-    const allowedUsers = isSuperAdminUser
+    const isInstructor = currentUser?.role === Role.INSTRUCTOR_MEDIALAB;
+    const allowedUsers = (isSuperAdminUser || isInstructor)
         ? users
         : users.filter(u => u.role !== Role.INSTRUCTOR_MEDIALAB);
 
@@ -200,8 +204,20 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                                     <label className="block text-xs font-medium text-gray-400 mb-1">Categoría</label>
                                     <select value={newUserCategory} onChange={e => setNewUserCategory(e.target.value as UserCategory)} className="w-full p-3 bg-black/20 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none appearance-none">
                                         <option value={UserCategory.APRENDIZ} className="bg-sena-dark">Aprendiz</option>
-                                        <option value={UserCategory.ADMINISTRATIVO} className="bg-sena-dark">Admin.</option>
-                                        <option value={UserCategory.INSTRUCTOR} className="bg-sena-dark">Instr. (Inv.)</option>
+                                        <option value={UserCategory.INSTRUCTOR_SENA} className="bg-sena-dark">Instructor SENA</option>
+                                        <option value={UserCategory.ADMINISTRATIVO} className="bg-sena-dark">Administrativo</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            {newUserRole === Role.INSTRUCTOR_MEDIALAB && (
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-400 mb-1">Categoría</label>
+                                    <select value={newUserCategory} onChange={e => setNewUserCategory(e.target.value as UserCategory)} className="w-full p-3 bg-black/20 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none appearance-none">
+                                        <option value={UserCategory.ADMIN} className="bg-sena-dark">Admin</option>
+                                        {(currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN') && (
+                                            <option value={UserCategory.SUPER_ADMIN} className="bg-sena-dark">Super Admin</option>
+                                        )}
                                     </select>
                                 </div>
                             )}
@@ -283,7 +299,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                                         <td className="px-6 py-4 text-sm font-medium text-white">{u.name}</td>
                                         <td className="px-6 py-4 text-sm text-gray-400">
                                             <span className={`px-2 py-1 rounded text-xs ${u.role === Role.INSTRUCTOR_MEDIALAB ? 'bg-blue-500/20 text-blue-300' : 'bg-white/10 text-gray-300'}`}>
-                                                {u.role === Role.INSTRUCTOR_MEDIALAB ? 'INSTRUCTOR' : u.category || 'APRENDIZ'}
+                                                {u.role === Role.INSTRUCTOR_MEDIALAB ? 'INSTRUCTOR-MEDIALAB' : u.category || 'APRENDIZ'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-sm font-medium">
@@ -354,6 +370,27 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                             <select value={editRole} onChange={e => setEditRole(e.target.value as Role)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none appearance-none">
                                 <option value={Role.USUARIO_MEDIALAB} className="bg-sena-dark">Usuario</option>
                                 <option value={Role.INSTRUCTOR_MEDIALAB} className="bg-sena-dark">Instructor</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {(currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN') && editRole === Role.USUARIO_MEDIALAB && (
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1 mt-4">Categoría</label>
+                            <select value={editCategory} onChange={e => setEditCategory(e.target.value as UserCategory)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none appearance-none">
+                                <option value={UserCategory.APRENDIZ} className="bg-sena-dark">Aprendiz</option>
+                                <option value={UserCategory.INSTRUCTOR_SENA} className="bg-sena-dark">Instructor SENA</option>
+                                <option value={UserCategory.ADMINISTRATIVO} className="bg-sena-dark">Administrativo</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {(currentUser?.isSuperAdmin || currentUser?.category === 'SUPER-ADMIN') && editRole === Role.INSTRUCTOR_MEDIALAB && (
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1 mt-4">Categoría</label>
+                            <select value={editCategory} onChange={e => setEditCategory(e.target.value as UserCategory)} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-white focus:border-sena-green outline-none appearance-none">
+                                <option value={UserCategory.ADMIN} className="bg-sena-dark">Admin</option>
+                                <option value={UserCategory.SUPER_ADMIN} className="bg-sena-dark">Super Admin</option>
                             </select>
                         </div>
                     )}
