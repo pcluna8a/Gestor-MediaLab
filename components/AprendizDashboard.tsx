@@ -236,9 +236,9 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
         doc.setTextColor(0, 0, 0);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
-        doc.text(`Nombre: ${currentUser.name}`, margin, y);
-        doc.text(`Identificación: ${currentUser.id}`, margin, y + 5);
-        doc.text(`Rol: ${currentUser.role} ${currentUser.category ? `(${currentUser.category})` : ''}`, margin, y + 10);
+        doc.text(`ID: ${currentUser.id}`, margin, y);
+        doc.text(`Nombre: ${currentUser.name}`, margin, y + 5);
+        doc.text(`Categoría: ${currentUser.category || 'N/A'}`, margin, y + 10);
         y += 20;
 
         // Section 2: Equipment

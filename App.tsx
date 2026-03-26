@@ -150,8 +150,24 @@ const MainApp: React.FC = () => {
           <div className="flex items-center gap-6">
             <div className="text-right hidden sm:block">
               <p className="text-sm font-semibold text-white">{getGreetingName(currentUser.name)}</p>
-              <p className="text-[10px] uppercase tracking-widest text-sena-green font-bold">{currentUser.role.replace(/_/g, ' ')}</p>
+              {currentUser.role === Role.USUARIO_MEDIALAB ? (
+                <p className="text-[10px] uppercase tracking-widest text-sena-green font-bold">
+                  ID: {currentUser.id}
+                </p>
+              ) : (
+                <p className="text-[10px] uppercase tracking-widest text-sena-green font-bold">
+                  {currentUser.role.replace(/_/g, ' ')}
+                </p>
+              )}
             </div>
+
+            {currentUser.role === Role.INSTRUCTOR_MEDIALAB && currentUser.photoURL ? (
+                <img src={currentUser.photoURL} alt="Perfil" className="w-10 h-10 rounded-full border-2 border-sena-green object-cover" />
+            ) : currentUser.role === Role.INSTRUCTOR_MEDIALAB ? (
+                <div className="w-10 h-10 rounded-full bg-sena-green/20 border-2 border-sena-green flex items-center justify-center text-white font-bold" title="Sin foto de perfil">
+                    {getGreetingName(currentUser.name).charAt(0).toUpperCase()}
+                </div>
+            ) : null}
 
             <button onClick={logout} className="p-2 rounded-full hover:bg-white/10 text-red-400 hover:text-red-300 transition-all border border-transparent hover:border-red-500/30" title="Cerrar Sesión">
               <LogoutIcon className="w-6 h-6" />
