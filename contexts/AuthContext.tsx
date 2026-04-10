@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Role, UserCategory } from '../types';
 import { auth, db } from '../firebaseConfig';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { collection, query, where, getDocs, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { loginInstructor, loginStudent, logoutUser, loginWithGoogle as loginWithGoogleService, sendPasswordReset as sendResetService, completeUserProfile } from '../services/firebaseService';
 
 interface AuthContextType {
@@ -24,27 +24,60 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Helper to find user profile by Auth data
 const fetchUserProfile = async (firebaseUser: FirebaseUser): Promise<User | null> => {
     try {
-        // Since we are moving to a unified ID system, and we always bind UID into the document,
-        // we can safely query the 'users' collection where 'uid' == firebaseUser.uid.
+        // Primary lookup: by Firebase Auth UID (fastest, indexed)
         const qUid = query(collection(db, 'users'), where('uid', '==', firebaseUser.uid), limit(1));
         const uidSnapshot = await getDocs(qUid);
         if (!uidSnapshot.empty) {
-            return uidSnapshot.docs[0].data() as User;
+            // Merge doc.id to guarantee user.id is always populated
+            return { id: uidSnapshot.docs[0].id, ...uidSnapshot.docs[0].data() } as User;
         }
 
-        // Keep a fallback just in case old admins were only registered by email without UID
+        // --- FALLBACK for manually-registered instructors ---
+        // These admins were created via ManageUsersView and may not have a uid field yet.
+        // We look them up by their institutional email and then bind the uid automatically.
         if (firebaseUser.email) {
             const qEmail = query(collection(db, 'users'), where('email', '==', firebaseUser.email), limit(1));
             const emailSnapshot = await getDocs(qEmail);
             if (!emailSnapshot.empty) {
-                return emailSnapshot.docs[0].data() as User;
+                const userDocRef = emailSnapshot.docs[0].ref;
+                const userData = emailSnapshot.docs[0].data() as User;
+
+                // Auto-bind the Firebase Auth uid to the Firestore document
+                // so that subsequent logins are resolved instantly via the primary lookup.
+                if (!userData.uid) {
+                    try {
+                        await updateDoc(userDocRef, { uid: firebaseUser.uid });
+                    } catch (bindError) {
+                        console.warn("Could not bind uid to user document:", bindError);
+                    }
+                }
+
+                return { id: emailSnapshot.docs[0].id, ...userData, uid: firebaseUser.uid };
             }
         }
 
-        return null; // Profile is incomplete
+        // Also try searching by googleEmail for Google-authenticated users
+        if (firebaseUser.email) {
+            const qGEmail = query(collection(db, 'users'), where('emailGoogle', '==', firebaseUser.email), limit(1));
+            const gEmailSnapshot = await getDocs(qGEmail);
+            if (!gEmailSnapshot.empty) {
+                const userDocRef = gEmailSnapshot.docs[0].ref;
+                const userData = gEmailSnapshot.docs[0].data() as User;
+                if (!userData.uid) {
+                    try {
+                        await updateDoc(userDocRef, { uid: firebaseUser.uid });
+                    } catch (bindError) {
+                        console.warn("Could not bind uid to user document:", bindError);
+                    }
+                }
+                return { id: gEmailSnapshot.docs[0].id, ...userData, uid: firebaseUser.uid };
+            }
+        }
+
+        return null; // No Firestore profile found — needs profile completion
     } catch (error) {
         console.error("Error fetching user profile:", error);
-        return null; // Force profile completion if fetch fails
+        return null;
     }
 };
 

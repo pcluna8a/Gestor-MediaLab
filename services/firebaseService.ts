@@ -287,7 +287,11 @@ export const subscribeToCollection = (collectionName: string, callback: (data: a
         (querySnapshot) => {
             const data: any[] = [];
             querySnapshot.forEach((doc) => {
-                data.push(doc.data());
+                // Always merge the Firestore document ID into the data object.
+                // doc.data() does NOT include the document ID by default, which causes
+                // user.id, equipment.id, etc. to be undefined if not explicitly stored as a field.
+                const docData = doc.data();
+                data.push({ id: doc.id, ...docData });
             });
             callback(data);
         },

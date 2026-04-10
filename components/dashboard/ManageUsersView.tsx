@@ -36,8 +36,9 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
             id: newUserId,
             name: newUserName.toUpperCase(),
             role: newUserRole,
-            category: newUserRole === Role.USUARIO_MEDIALAB ? newUserCategory : undefined,
+            category: newUserCategory,
             email: newUserRole === Role.INSTRUCTOR_MEDIALAB ? newUserEmail : undefined,
+            isSuperAdmin: newUserCategory === UserCategory.SUPER_ADMIN
         };
 
         const result = onAddNewUser(newUser);
@@ -80,6 +81,7 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                 email: editEmail,
                 role: editRole,
                 category: editCategory,
+                isSuperAdmin: editCategory === UserCategory.SUPER_ADMIN,
                 photoURL: editPhoto || undefined
             });
             setEditingUser(null);
