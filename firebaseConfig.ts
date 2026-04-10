@@ -24,7 +24,8 @@ try {
   dbInstance = initializeFirestore(app, {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager()
-    })
+    }),
+    ignoreUndefinedProperties: true
   });
 
   authInstance = getAuth(app);
