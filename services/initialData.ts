@@ -1,4 +1,4 @@
-import { Equipment, EquipmentStatus } from '../types';
+import { Equipment, EquipmentStatus, User, Role, UserCategory } from '../types';
 
 export const DEFAULT_EQUIPMENT: Equipment[] = [
   {
@@ -2661,4 +2661,29 @@ export const DEFAULT_EQUIPMENT: Equipment[] = [
     status: EquipmentStatus.AVAILABLE,
     imageUrl: 'https://resource.logitech.com/w_800,h_800,c_limit,q_auto,f_auto,dpr_1.0/d_transparent.gif/content/dam/logitech/en/products/keyboards/mx-keys-s/gallery/mx-keys-s-keyboard-gallery-graphite-1-ch.png?v=1'
   }
+];
+
+export const DEFAULT_APRENDICES: User[] = [
+  { id: '1003810379', name: 'KAREN VANESSA FALLA HEREDIA', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'vanesithafalla559@gmail.com', email: 'vanesithafalla559@gmail.com' },
+  { id: '1003895841', name: 'DARWIN ROA MARIN', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'darwinroamarin@gmail.com', email: 'darwinroamarin@gmail.com' },
+  { id: '1029880390', name: 'LAURA SOFIA OTALORA RAMIREZ', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'laurasofiiramirez@icloud.com', email: 'laurasofiiramirez@icloud.com' },
+  { id: '1029882294', name: 'TANIA KATERIN ESQUIVEL CHACON', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'taniakaterinesquivelchacon@gmail.com', email: 'taniakaterinesquivelchacon@gmail.com' },
+  { id: '1073681685', name: 'KAREN JULIETH RAMIREZ FALLA', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'karenjuliethramirezfalla@gmail.com', email: 'karenjuliethramirezfalla@gmail.com' },
+  { id: '1075215351', name: 'MAIRA ALEJANDRA SUAREZ PERDOMO', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'abbby1612@gmail.com', email: 'abbby1612@gmail.com' },
+  { id: '1075219203', name: 'JULIAN DAVID LIS TAO', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'juliandavidlistao8@gmail.com', email: 'juliandavidlistao8@gmail.com' },
+  { id: '1075235951', name: 'JESMAN JORLEY FIRIGUA MURCIA', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'jesmanmurcia@gmail.com', email: 'jesmanmurcia@gmail.com' },
+  { id: '1075244982', name: 'DIEGO FERNANDO HERRERA GARCIA', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'diegoherreragar@hotmail.es', email: 'diegoherreragar@hotmail.es' },
+  { id: '1075279301', name: 'MARGIE LUCEY YAGUARA SEGURA', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'maryiiyaguara0112@gmail.com', email: 'maryiiyaguara0112@gmail.com' },
+  { id: '1076500073', name: 'ANDRES CAMILO GIL ALMEIDA', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'anmajilpa@gmail.com', email: 'anmajilpa@gmail.com' },
+  { id: '1076502460', name: 'MARIA DE LOS ANGELES CASTRO TRUJILLO', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'teuluhiyokaseuteulocheonsauima@gmail.com', email: 'teuluhiyokaseuteulocheonsauima@gmail.com' },
+  { id: '1077228821', name: 'CARLOS ANDRES MOJICA CRUZ', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'carlosandresmojicacruz@gmail.com', email: 'carlosandresmojicacruz@gmail.com' },
+  { id: '1077721875', name: 'ANA MARIA ALMARIO HURTADO', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'aalmariohurt2005@gmail.com', email: 'aalmariohurt2005@gmail.com' },
+  { id: '1077724258', name: 'ANGIE CAROLINA UNI GARZON', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'angiecauni0405@gmail.com', email: 'angiecauni0405@gmail.com' },
+  { id: '1083839024', name: 'MARIA CAMILA CUBILLOS AVILA', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'camilacubillosavila@gmail.com', email: 'camilacubillosavila@gmail.com' },
+  { id: '1121718462', name: 'JHON JAIME ANDRES SAPUYES GASCA', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'gascaandrey505@gmail.com', email: 'gascaandrey505@gmail.com' },
+  { id: '1127072071', name: 'SAIRA FERNANDA OSPINA CHÁVEZ', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'ospinachavezsairafernanda@gmail.com', email: 'ospinachavezsairafernanda@gmail.com' },
+  { id: '36312241', name: 'LUISA FERNANDA SUAREZ PERDOMO', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'luisafernandasuarezp@gmail.com', email: 'luisafernandasuarezp@gmail.com' },
+  { id: '1025324973', name: 'DANA MONTES CARREÑO', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'dannamontes956@gmail.com', email: 'dannamontes956@gmail.com' },
+  { id: '1076907896', name: 'JOHAN ESTEBAN LOPEZ MUÑOZ', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'johanestebanlopezmunoz@gmail.com', email: 'johanestebanlopezmunoz@gmail.com' },
+  { id: '1077231449', name: 'LUIS MIGUEL POLOCHE DIAZ', role: Role.USUARIO_MEDIALAB, category: UserCategory.APRENDIZ, emailGoogle: 'secundariamiguel1234@gmail.com', email: 'secundariamiguel1234@gmail.com' }
 ];

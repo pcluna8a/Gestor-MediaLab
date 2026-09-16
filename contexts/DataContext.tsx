@@ -8,7 +8,8 @@ import {
     registerNewLoanInCloud,
     registerReturnInCloud,
     addUserToCloud,
-    updateEquipmentImageInCloud
+    updateEquipmentImageInCloud,
+    syncAprendicesToCloud
 } from '../services/firebaseService';
 import { useAuth } from './AuthContext';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -96,6 +97,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUsers([]);
             return;
         }
+
+        // Automatic background sync for default Aprendices list
+        syncAprendicesToCloud();
 
         const unsubLoans = subscribeToCollection('loans', (data) => {
             // Parse dates if they come as strings

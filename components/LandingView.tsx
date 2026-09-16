@@ -5,6 +5,46 @@ import { ArrowRightIcon, CameraIcon, ChartBarIcon, ShieldCheckIcon } from './Ico
 
 gsap.registerPlugin(ScrollTrigger);
 
+interface HeroVariant {
+  badge: string;
+  titlePrefix: string;
+  titleHighlight: string;
+  subtitle: string;
+}
+
+const HERO_VARIANTS: HeroVariant[] = [
+  {
+    badge: 'EXCELENCIA TÉCNICA Y RECURSOS AUDIOVISUALES',
+    titlePrefix: 'Tecnología de',
+    titleHighlight: 'Vanguardia en tus Manos',
+    subtitle: 'Preserva, cuida y optimiza cada equipo audiovisual del MediaLab CIES. La innovación tecnológica comienza con la responsabilidad y el trabajo en equipo.'
+  },
+  {
+    badge: 'CUIDADO CONSCIENTE Y COMPROMISO SENA',
+    titlePrefix: 'Creatividad que',
+    titleHighlight: 'Transforma e Inspira',
+    subtitle: 'Cada cámara, lente y micrófono impulsa el talento de nuestra comunidad. Úsalos con rigor profesional, cuida los recursos y eleva la calidad de tus proyectos.'
+  },
+  {
+    badge: 'INSTRUMENTO DE PRECISIÓN Y CONTROL',
+    titlePrefix: 'Instrumento de',
+    titleHighlight: 'Precisión Digital',
+    subtitle: 'Gestión inmersiva, auditoría en tiempo real y trazabilidad total para el control ético y eficiente del inventario del MediaLab.'
+  },
+  {
+    badge: 'RESPONSABILIDAD Y CULTURA DE RESERVA',
+    titlePrefix: 'Compromiso con el',
+    titleHighlight: 'Futuro Audiovisual',
+    subtitle: 'El inventario del MediaLab es patrimonio de todos. Devuelve tus equipos a tiempo, en óptimas condiciones y mantén viva la cadena de producción.'
+  },
+  {
+    badge: 'GESTIÓN EFICIENTE E INNOVACIÓN CIES',
+    titlePrefix: 'Potencia tu Talento',
+    titleHighlight: 'Con Control Total',
+    subtitle: 'Sincronización PWA offline, reservas ágiles y responsabilidad compartida. La herramienta digital que garantiza la disponibilidad técnica para toda la comunidad SENA.'
+  }
+];
+
 const DASHBOARD_SCREENSHOTS = [
   '/dashboard_home.png',
   '/dashboard_inventory.png',
@@ -18,6 +58,25 @@ interface LandingViewProps {
 const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentScreenshot, setCurrentScreenshot] = useState(Math.floor(Math.random() * 3));
+
+  // Dynamic Hero Title Rotation on every entry/load
+  const [heroIndex, setHeroIndex] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('medialab_hero_index');
+      let nextIdx = 0;
+      if (saved !== null) {
+        nextIdx = (parseInt(saved, 10) + 1) % HERO_VARIANTS.length;
+      } else {
+        nextIdx = Math.floor(Math.random() * HERO_VARIANTS.length);
+      }
+      sessionStorage.setItem('medialab_hero_index', nextIdx.toString());
+      return nextIdx;
+    } catch {
+      return 0;
+    }
+  });
+
+  const activeHero = HERO_VARIANTS[heroIndex];
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -73,7 +132,7 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
     }, containerRef);
 
     return () => ctx.revert();
-  }, []);
+  }, [heroIndex]);
 
   return (
     <div ref={containerRef} className="min-h-screen bg-sena-blue text-gray-200 overflow-x-hidden selection:bg-sena-green selection:text-white font-sans">
@@ -104,24 +163,44 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
         <div className="max-w-4xl mx-auto z-10">
           <div className="hero-text inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sena-green/10 border border-sena-green/20 text-sena-green font-mono text-[10px] sm:text-xs mb-8 tracking-widest text-center leading-relaxed">
             <span className="w-2 h-2 rounded-full bg-sena-green animate-pulse flex-shrink-0"></span>
-            Centro de la Industria, la Empresa y los Servicios — CIES
+            {activeHero.badge}
           </div>
+          
           <h1 className="hero-text text-5xl md:text-7xl font-extrabold text-white tracking-tighter mb-6 leading-tight">
-            Instrumento de <br className="hidden md:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sena-green to-emerald-400">
-              Precisión Digital
+            {activeHero.titlePrefix} <br className="hidden md:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sena-green via-emerald-300 to-teal-400">
+              {activeHero.titleHighlight}
             </span>
           </h1>
-          <p className="hero-text text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto font-light leading-relaxed">
-            Gestión inmersiva, auditoría en tiempo real y sincronización PWA offline para el control absoluto del inventario audiovisual.
+
+          <p className="hero-text text-lg md:text-xl text-gray-300 mb-10 max-w-2xl mx-auto font-light leading-relaxed">
+            {activeHero.subtitle}
           </p>
-          <div className="hero-text flex justify-center">
+
+          <div className="hero-text flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
               onClick={onEnter}
               className="px-8 py-4 bg-sena-green text-white font-bold rounded-xl shadow-[0_0_20px_rgba(57,169,0,0.4)] hover:shadow-[0_0_30px_rgba(57,169,0,0.6)] hover:scale-105 transition-all text-lg flex items-center gap-3"
             >
               Iniciar Gestión del Préstamo <ArrowRightIcon className="w-5 h-5" />
             </button>
+          </div>
+
+          {/* Dynamic Hero Selector Pills */}
+          <div className="hero-text mt-8 flex items-center justify-center gap-2">
+            {HERO_VARIANTS.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setHeroIndex(idx)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  idx === heroIndex
+                    ? 'w-8 bg-sena-green shadow-[0_0_10px_rgba(57,169,0,0.8)]'
+                    : 'w-2 bg-white/20 hover:bg-white/40'
+                }`}
+                aria-label={`Ver título de inspiración ${idx + 1}`}
+                title={`Ver propuesta inspiradora ${idx + 1}`}
+              />
+            ))}
           </div>
         </div>
 

@@ -17,7 +17,7 @@ import {
 } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
 import { Equipment, LoanRecord, User, EquipmentStatus, Role, UserCategory, AuditLog, SystemSettings } from '../types';
-import { DEFAULT_EQUIPMENT } from './initialData';
+import { DEFAULT_EQUIPMENT, DEFAULT_APRENDICES } from './initialData';
 
 // --- CONSTANTES ---
 const COLL_EQUIPMENT = 'equipment';
@@ -483,6 +483,15 @@ export const seedCloudDatabase = async (onProgress?: (message: string, percentag
             });
         });
 
+        // Seed default aprendices from initialData
+        DEFAULT_APRENDICES.forEach(usr => {
+            allOperations.push({
+                type: 'set',
+                ref: doc(db!, COLL_USERS, usr.id),
+                data: usr
+            });
+        });
+
         const totalDocs = allOperations.length;
         const BATCH_SIZE = 400;
         const chunks = [];
@@ -507,6 +516,21 @@ export const seedCloudDatabase = async (onProgress?: (message: string, percentag
 
     } catch (error: any) {
         return { success: false, message: `Error crítico: ${error.message || String(error)}` };
+    }
+};
+
+export const syncAprendicesToCloud = async () => {
+    if (!db) return { success: false, count: 0 };
+    try {
+        const batch = writeBatch(db);
+        DEFAULT_APRENDICES.forEach(user => {
+            batch.set(doc(db!, COLL_USERS, user.id), user, { merge: true });
+        });
+        await batch.commit();
+        return { success: true, count: DEFAULT_APRENDICES.length };
+    } catch (e: any) {
+        console.error("Error sincronizando aprendices:", e);
+        return { success: false, count: 0, error: e.message };
     }
 };
 
