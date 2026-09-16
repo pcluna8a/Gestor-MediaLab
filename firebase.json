@@ -15,6 +15,7 @@
         }
     ],
     "hosting": {
+        "site": "gestor-medialab-sena",
         "public": "dist",
         "ignore": [
             "firebase.json",
