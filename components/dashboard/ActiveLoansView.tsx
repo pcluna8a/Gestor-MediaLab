@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LoanRecord, Equipment, User } from '../../types';
+import { LoanRecord, Equipment, User, UserCategory } from '../../types';
 import { analyzeEquipmentCondition } from '../../services/geminiService';
 import Modal from '../Modal';
 import Spinner from '../Spinner';
@@ -12,11 +12,17 @@ interface ActiveLoansViewProps {
     equipment: Equipment[];
     users: User[];
     onReturn: (loanId: string, returnConcept: string, returnStatus: string, returnPhoto?: string[], returnAnalysis?: string) => void;
+    currentUser?: User;
 }
 
 type SortKey = 'equipment' | 'user' | 'date';
 
-const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, users, onReturn }) => {
+const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, users, onReturn, currentUser }) => {
+    const isAuthorizedInstructor = (loan: LoanRecord) => {
+        if (!currentUser) return false;
+        const isSuperAdmin = currentUser.isSuperAdmin || (currentUser.category as string) === 'SUPER-ADMIN';
+        return currentUser.id === loan.instructorId || isSuperAdmin;
+    };
     const activeLoans = loans.filter(l => !l.returnDate).sort((a, b) => b.loanDate.getTime() - a.loanDate.getTime());
 
     const [currentPage, setCurrentPage] = useState(1);
@@ -94,6 +100,7 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
     const [aiAnalysis, setAiAnalysis] = useState('');
 
     const openReturnModal = (loan: LoanRecord) => {
+        if (!isAuthorizedInstructor(loan)) return;
         setSelectedLoan(loan);
         setReturnConcept('');
         setReturnStatus('Bueno');
@@ -236,7 +243,10 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                 onClick={() => handleSort('user')}
                                 className="px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors select-none"
                             >
-                                Usuario{getSortIndicator('user')}
+                                Prestatario{getSortIndicator('user')}
+                            </th>
+                            <th className="px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                Instructor Responsable
                             </th>
                             <th
                                 onClick={() => handleSort('date')}
@@ -250,12 +260,16 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                     <tbody className="divide-y divide-white/5">
                         {sortedLoans.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="px-6 py-8 text-center text-gray-500 italic">No hay préstamos activos.</td>
+                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500 italic">No hay préstamos activos.</td>
                             </tr>
                         ) : (
                             paginatedLoans.map((loan) => {
                                 const eq = equipment.find(e => e.id === loan.equipmentId);
                                 const usr = users.find(u => u.id === loan.borrowerId);
+                                const inst = users.find(u => u.id === loan.instructorId);
+                                const canReturn = isAuthorizedInstructor(loan);
+                                const instructorName = inst?.name || loan.instructorId || 'Instructor Medialab';
+
                                 return (
                                     <tr key={loan.id} className="hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white flex items-center gap-3">
@@ -275,15 +289,30 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                             </div>
                                             <div className="text-[10px] text-gray-500 font-mono mt-1">ID: {loan.borrowerId}</div>
                                         </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-semibold text-gray-200">
+                                                {instructorName}
+                                            </div>
+                                            <div className="text-[10px] text-sena-green/80 font-mono mt-0.5">Autorizó Préstamo</div>
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{loan.loanDate.toLocaleDateString()} {loan.loanDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <button
-                                                onClick={() => openReturnModal(loan)}
-                                                className="text-sena-green hover:text-green-300 font-bold text-xs uppercase tracking-wider transition-colors"
-                                                aria-label={`Registrar devolución de ${eq?.name || loan.equipmentId}`}
-                                            >
-                                                Registrar Devolución
-                                            </button>
+                                            {canReturn ? (
+                                                <button
+                                                    onClick={() => openReturnModal(loan)}
+                                                    className="text-sena-green hover:text-green-300 font-bold text-xs uppercase tracking-wider transition-colors bg-sena-green/10 hover:bg-sena-green/20 border border-sena-green/30 px-3 py-1.5 rounded-lg"
+                                                    aria-label={`Registrar devolución de ${eq?.name || loan.equipmentId}`}
+                                                >
+                                                    Registrar Devolución
+                                                </button>
+                                            ) : (
+                                                <div
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold select-none"
+                                                    title={`Devolución restringida: Solo ${instructorName} puede recibir este equipo.`}
+                                                >
+                                                    <span>🔒 Solo {instructorName.split(' ')[0]}</span>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 );
