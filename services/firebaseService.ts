@@ -16,7 +16,7 @@ import {
     getDoc
 } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
-import { Equipment, LoanRecord, User, EquipmentStatus, Role, UserCategory, AuditLog, SystemSettings } from '../types';
+import { Equipment, LoanRecord, User, EquipmentStatus, Role, UserCategory, AuditLog, SystemSettings, isValidUserFullName, isValidUserEmail } from '../types';
 import { DEFAULT_EQUIPMENT, DEFAULT_APRENDICES } from './initialData';
 
 // --- CONSTANTES ---
@@ -200,24 +200,98 @@ export const checkDuplicateUser = async (
     }
 };
 
+/**
+ * Verifica si un ID corresponde a un equipo del inventario de MediaLab
+ */
+export const checkIsEquipmentId = async (id: string): Promise<{ isEquipment: boolean; equipmentName?: string }> => {
+    if (!db || !id) return { isEquipment: false };
+    try {
+        const cleanId = id.trim();
+        const eqRef = doc(db, COLL_EQUIPMENT, cleanId);
+        const eqSnap = await getDoc(eqRef);
+        if (eqSnap.exists()) {
+            const eqData = eqSnap.data() as Equipment;
+            return {
+                isEquipment: true,
+                equipmentName: eqData.name || eqData.description || 'Equipo de Inventario'
+            };
+        }
+        return { isEquipment: false };
+    } catch (e) {
+        console.warn("Error checking equipment ID:", e);
+        return { isEquipment: false };
+    }
+};
+
+/**
+ * Consulta si un usuario ya existe en Firestore por su ID de documento
+ */
+export const checkExistingUserById = async (id: string): Promise<{ exists: boolean; user?: User }> => {
+    if (!db || !id) return { exists: false };
+    try {
+        const cleanId = id.trim().replace(/[^0-9]/g, '');
+        if (!cleanId) return { exists: false };
+        const userRef = doc(db, COLL_USERS, cleanId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+            return { exists: true, user: userSnap.data() as User };
+        }
+        return { exists: false };
+    } catch (e) {
+        return { exists: false };
+    }
+};
+
 export const completeUserProfile = async (
     id: string,
     uid: string,
     category: string,
     email?: string,
     emailGoogle?: string,
-    name: string = 'Usuario Registrado'
+    name?: string
 ) => {
     if (!db) return { success: false, error: "Servicios no inicializados" };
 
+    const cleanId = id.trim().replace(/[^0-9]/g, '');
+    if (!cleanId || cleanId.length < 5) {
+        return { success: false, error: "El documento de identidad debe contener al menos 5 dígitos numéricos." };
+    }
+
+    // 1. REGLA CRÍTICA: Un usuario NUNCA puede registrarse con el ID de un equipo del inventario
+    const eqCheck = await checkIsEquipmentId(cleanId);
+    if (eqCheck.isEquipment) {
+        return {
+            success: false,
+            error: `⚠️ El documento ingresado (${cleanId}) pertenece al equipo "${eqCheck.equipmentName}" del inventario. Debes ingresar tu documento de identidad personal.`
+        };
+    }
+
+    // 2. REGLA CRÍTICA: Nombre y Apellido obligatorios y válidos (mínimo dos palabras)
+    const trimmedName = (name || '').trim();
+    if (!isValidUserFullName(trimmedName)) {
+        return {
+            success: false,
+            error: "Debes ingresar tu Nombre y Apellido completos (mínimo dos palabras). No se permiten registros sin apellidos o genéricos."
+        };
+    }
+
+    // 3. REGLA CRÍTICA: Correo electrónico obligatorio
+    const effectiveEmail = (email || emailGoogle || '').trim();
+    if (!isValidUserEmail(effectiveEmail)) {
+        return {
+            success: false,
+            error: "Debes ingresar un correo electrónico válido para completar tu registro."
+        };
+    }
+
     try {
-        const userRef = doc(db, COLL_USERS, id);
+        const userRef = doc(db, COLL_USERS, cleanId);
 
         // --- Anti-Duplicity Check (before creating new users) ---
         const existingSnap = await getDoc(userRef);
         if (!existingSnap.exists()) {
             // Only run full duplicate check when creating a NEW user
-            const duplicateCheck = await checkDuplicateUser(id, email, emailGoogle, name);
+            const duplicateCheck = await checkDuplicateUser(cleanId, effectiveEmail, emailGoogle, trimmedName);
             if (duplicateCheck.isDuplicate) {
                 return {
                     success: false,
@@ -230,12 +304,16 @@ export const completeUserProfile = async (
             const userSnap = await transaction.get(userRef);
 
             if (userSnap.exists()) {
-                // User exists, merge data
+                // User exists, merge data and fix any previous incomplete/generic name
                 const userData = userSnap.data() as User;
                 const updates: any = {};
 
+                if (trimmedName && (!isValidUserFullName(userData.name) || userData.name !== trimmedName)) {
+                    updates.name = trimmedName;
+                }
+
                 if (uid && !userData.uid) updates.uid = uid;
-                if (email && !userData.email) updates.email = email;
+                if (effectiveEmail && (!userData.email || !isValidUserEmail(userData.email))) updates.email = effectiveEmail;
                 if (emailGoogle && !userData.emailGoogle) updates.emailGoogle = emailGoogle;
                 if (category && userData.category !== category) {
                     updates.category = category;
@@ -251,17 +329,17 @@ export const completeUserProfile = async (
                     transaction.update(userRef, updates);
                 }
             } else {
-                // User does not exist, create new unified record
+                // User does not exist, create new unified record with full valid data
                 const isInstructorCategory = category === UserCategory.SUPER_ADMIN || category === UserCategory.ADMIN;
                 const newUser: User = {
-                    id,
+                    id: cleanId,
                     uid,
-                    name,
+                    name: trimmedName,
                     role: isInstructorCategory ? Role.INSTRUCTOR_MEDIALAB : Role.USUARIO_MEDIALAB,
                     category: category as any,
                 };
                 if (category === UserCategory.SUPER_ADMIN) newUser.isSuperAdmin = true;
-                if (email) newUser.email = email;
+                if (effectiveEmail) newUser.email = effectiveEmail;
                 if (emailGoogle) newUser.emailGoogle = emailGoogle;
 
                 transaction.set(userRef, newUser);
@@ -308,21 +386,57 @@ export const registerNewLoanInCloud = async (loan: LoanRecord) => {
 
     try {
         await runTransaction(db, async (transaction) => {
-            const equipmentRef = doc(db!, COLL_EQUIPMENT, loan.equipmentId);
-            const loanRef = doc(db!, COLL_LOANS, loan.id);
+            const borrowerId = (loan.borrowerId || '').trim();
+            const equipmentId = (loan.equipmentId || '').trim();
 
-            // Check if equipment is already on loan
+            // 1. Inconsistencia crítica: El prestatario NO puede ser el mismo equipo
+            if (borrowerId === equipmentId) {
+                throw new Error('Inconsistencia: El ID del prestatario no puede ser igual al ID del equipo a prestar.');
+            }
+
+            // 2. Verificar que el prestatario NO sea un equipo del inventario
+            const borrowerAsEqRef = doc(db!, COLL_EQUIPMENT, borrowerId);
+            const borrowerAsEqSnap = await transaction.get(borrowerAsEqRef);
+            if (borrowerAsEqSnap.exists()) {
+                const eqData = borrowerAsEqSnap.data() as Equipment;
+                throw new Error(`El ID "${borrowerId}" ingresado como prestatario corresponde al equipo "${eqData.name || 'Equipo'}" del inventario y no a una persona.`);
+            }
+
+            // 3. Verificar que el equipo exista y esté disponible
+            const equipmentRef = doc(db!, COLL_EQUIPMENT, equipmentId);
             const equipmentSnap = await transaction.get(equipmentRef);
             if (!equipmentSnap.exists()) {
                 throw new Error('El equipo no existe en el inventario.');
             }
-            const equipmentData = equipmentSnap.data();
+            const equipmentData = equipmentSnap.data() as Equipment;
             if (equipmentData.status === EquipmentStatus.ON_LOAN) {
                 throw new Error('Este equipo ya se encuentra prestado. Debe ser devuelto antes de generar un nuevo préstamo.');
             }
 
+            // 4. Verificar que el usuario prestatario aparezca previamente registrado en la base de datos
+            const borrowerRef = doc(db!, COLL_USERS, borrowerId);
+            const borrowerSnap = await transaction.get(borrowerRef);
+            if (!borrowerSnap.exists()) {
+                throw new Error(`El usuario con ID "${borrowerId}" no aparece registrado previamente en la base de datos. Debe completar su registro de usuario antes de acceder al préstamo.`);
+            }
+
+            // 5. Verificar que el prestatario tenga Nombre y Apellido válidos (no genéricos como "Usuario Registrado")
+            const borrower = borrowerSnap.data() as User;
+            if (!isValidUserFullName(borrower.name)) {
+                throw new Error(`El usuario prestatario (ID: ${borrowerId}) no tiene registrado su Nombre y Apellido completos (figura como "${borrower.name || 'Sin nombre'}"). Debe completar su registro antes de proceder con el préstamo.`);
+            }
+
+            // 6. Verificar que el prestatario tenga un correo electrónico registrado
+            const borrowerEmail = borrower.email || borrower.emailGoogle;
+            if (!isValidUserEmail(borrowerEmail)) {
+                throw new Error(`El usuario prestatario (ID: ${borrowerId}) no tiene un correo electrónico válido registrado. Debe completar su registro antes de proceder con el préstamo.`);
+            }
+
+            const loanRef = doc(db!, COLL_LOANS, loan.id);
             const loanData = {
                 ...loan,
+                borrowerId,
+                equipmentId,
                 loanDate: loan.loanDate instanceof Date ? loan.loanDate.toISOString() : loan.loanDate,
                 returnDate: null
             };
@@ -339,7 +453,7 @@ export const registerNewLoanInCloud = async (loan: LoanRecord) => {
 export const registerReturnInCloud = async (
     loanId: string,
     equipmentId: string,
-    returnData: { concept: string, status: string, photos: string[], analysis: string }
+    returnData: { concept: string, status: string, photos: string[], analysis: string, returnedByInstructorId?: string }
 ) => {
     if (!db) return { success: false, error: "Base de datos no disponible" };
 
@@ -348,13 +462,19 @@ export const registerReturnInCloud = async (
             const equipmentRef = doc(db!, COLL_EQUIPMENT, equipmentId);
             const loanRef = doc(db!, COLL_LOANS, loanId);
 
-            transaction.update(loanRef, {
+            const updatePayload: any = {
                 returnDate: new Date().toISOString(),
                 returnConcept: returnData.concept,
                 returnStatus: returnData.status,
                 returnPhotos: returnData.photos,
                 returnConditionAnalysis: returnData.analysis
-            });
+            };
+
+            if (returnData.returnedByInstructorId) {
+                updatePayload.returnedByInstructorId = returnData.returnedByInstructorId;
+            }
+
+            transaction.update(loanRef, updatePayload);
             transaction.update(equipmentRef, { status: EquipmentStatus.AVAILABLE });
         });
         return { success: true };
@@ -363,19 +483,75 @@ export const registerReturnInCloud = async (
     }
 };
 
-export const addUserToCloud = async (user: User) => {
-    if (!db) return;
+export const addUserToCloud = async (user: User): Promise<{ success: boolean; error?: string }> => {
+    if (!db) return { success: false, error: "Base de datos no disponible" };
+
+    const cleanId = (user.id || '').trim().replace(/[^0-9]/g, '');
+    if (!cleanId || cleanId.length < 5) {
+        return { success: false, error: "El documento debe contener al menos 5 dígitos numéricos." };
+    }
+
+    // Comprobar que no coincida con un equipo de inventario
+    const eqCheck = await checkIsEquipmentId(cleanId);
+    if (eqCheck.isEquipment) {
+        return {
+            success: false,
+            error: `El ID ${cleanId} coincide con el equipo "${eqCheck.equipmentName}" del inventario. No se puede crear un usuario con este documento.`
+        };
+    }
+
+    if (!isValidUserFullName(user.name)) {
+        return {
+            success: false,
+            error: "El usuario debe tener un Nombre y Apellido completos (mínimo dos palabras). No se permiten registros genéricos."
+        };
+    }
+
+    const email = user.email || user.emailGoogle;
+    if (email && !isValidUserEmail(email)) {
+        return {
+            success: false,
+            error: "El correo electrónico ingresado no es válido."
+        };
+    }
+
     if (user.role === Role.INSTRUCTOR_MEDIALAB && !user.passwordHash) {
-        const { hash, salt } = await hashPassword(user.id);
+        const { hash, salt } = await hashPassword(cleanId);
         user.passwordHash = hash;
         (user as any).passwordSalt = salt;
         user.forcePasswordChange = true;
     }
+
     try {
-        await setDoc(doc(db, COLL_USERS, user.id), user);
+        await setDoc(doc(db, COLL_USERS, cleanId), { ...user, id: cleanId, name: user.name.trim() }, { merge: true });
+        return { success: true };
     } catch (e: any) {
         console.error("Add user error:", e.message);
+        return { success: false, error: e.message || String(e) };
     }
+};
+
+/**
+ * Limpia el usuario anómalo con ID de equipo (ej. 95271024891) si fue creado por error en users
+ */
+export const cleanupEquipmentUserCollisions = async (): Promise<{ cleanedCount: number }> => {
+    if (!db) return { cleanedCount: 0 };
+    let cleanedCount = 0;
+    try {
+        const userRef = doc(db, COLL_USERS, '95271024891');
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+            const data = userSnap.data() as User;
+            if (!isValidUserFullName(data.name) || data.name === 'Usuario Registrado') {
+                await deleteDoc(userRef);
+                console.log("Limpiado usuario colisionado con equipo:", '95271024891');
+                cleanedCount++;
+            }
+        }
+    } catch (err) {
+        console.warn("cleanupEquipmentUserCollisions warning:", err);
+    }
+    return { cleanedCount };
 };
 
 export const updateUserInCloud = async (user: User) => {

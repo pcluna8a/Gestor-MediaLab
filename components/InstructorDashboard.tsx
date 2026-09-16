@@ -80,10 +80,11 @@ const InstructorDashboard: React.FC<DashboardProps> = (props) => {
                 <Suspense fallback={<div className="flex justify-center items-center h-64"><Spinner size="12" color="sena-green" /></div>}>
                     {activeTab === 'home' && <HomeView loans={props.loans} equipment={props.equipment} onTabChange={setActiveTab} />}
                     {activeTab === 'newLoan' && <NewLoanView users={props.users} equipment={props.equipment} onNewLoan={props.onNewLoan} currentUser={props.currentUser} />}
-                    {activeTab === 'activeLoans' && <ActiveLoansView loans={props.loans} equipment={props.equipment} users={props.users} onReturn={props.onReturn} currentUser={props.currentUser} />}
+                    {activeTab === 'activeLoans' && <ActiveLoansView loans={props.loans} equipment={props.equipment} users={props.users} currentUser={props.currentUser} onReturn={props.onReturn} />}
                     {activeTab === 'manageUsers' && (
                         <ManageUsersView
                             users={props.users}
+                            equipment={props.equipment}
                             currentUser={props.currentUser}
                             onAddNewUser={props.onAddNewUser as any}
                             onUpdateUser={props.onUpdateUser || (() => { })}

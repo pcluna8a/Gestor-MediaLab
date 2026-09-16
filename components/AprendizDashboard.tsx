@@ -1,10 +1,11 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, LoanRecord, Equipment, Role, EquipmentStatus, createNewLoan } from '../types';
+import { User, LoanRecord, Equipment, Role, EquipmentStatus, createNewLoan, isProfileIncomplete, isValidUserFullName } from '../types';
 import { CameraCapture } from './CameraCapture';
 import { readInventoryLabel } from '../services/geminiService';
 import Spinner from './Spinner';
 import { CameraIcon, DownloadIcon, HistoryIcon } from './Icons';
+import { CompleteProfileModal } from './CompleteProfileModal';
 import jsPDF from 'jspdf';
 
 type Tab = 'myLoans' | 'newLoan';
@@ -95,6 +96,9 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
     const [scanningError, setScanningError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submissionSuccess, setSubmissionSuccess] = useState(false);
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+
+    const hasIncompleteProfile = isProfileIncomplete(currentUser);
     
     const instructors = useMemo(() => (users || []).filter(u => u.role === Role.INSTRUCTOR_MEDIALAB), [users]);
     
@@ -296,7 +300,21 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setScanningError('');
         if (!selectedInstructor || !inventoryCode || !foundEquipment) return;
+
+        // 1. REGLA: El equipo NO puede tener el mismo ID que el prestatario
+        if (foundEquipment.id === currentUser.id) {
+            setScanningError("Error: El código del equipo a prestar es idéntico a tu número de documento de identidad. Verifica la placa o código.");
+            return;
+        }
+
+        // 2. REGLA: El prestatario debe tener Nombre y Apellido completos y correo registrado
+        if (hasIncompleteProfile) {
+            setScanningError("Debes registrar previamente tu Nombre, Apellido y Correo para solicitar un préstamo.");
+            setIsEditingProfile(true);
+            return;
+        }
 
         setIsSubmitting(true);
         
@@ -357,6 +375,33 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
                 <h2 className="text-2xl font-bold text-sena-dark dark:text-white">Solicitar Préstamo de Equipo</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Completa los datos para generar tu comprobante digital.</p>
             </div>
+
+            {hasIncompleteProfile && (
+                <div className="p-4 bg-amber-500/10 border-2 border-amber-500/40 rounded-xl text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-shake">
+                    <div>
+                        <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                            <span>⚠️ Registro de Usuario Incompleto</span>
+                        </h4>
+                        <p className="text-xs text-amber-300/90 mt-1">
+                            Para acceder al préstamo es obligatorio contar con tu Nombre, Apellido y Correo electrónico registrados. Actualmente figuras como <strong className="text-white">"{currentUser.name || 'Sin nombre'}"</strong>.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setIsEditingProfile(true)}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded-lg transition-all shadow-md whitespace-nowrap"
+                    >
+                        Completar Mis Datos
+                    </button>
+                </div>
+            )}
+
+            {isEditingProfile && (
+                <CompleteProfileModal
+                    onClose={() => setIsEditingProfile(false)}
+                    forceEdit={true}
+                />
+            )}
             
             {/* Section 1: Instructor */}
             <div>
@@ -465,14 +510,18 @@ const NewLoanRequestForm: React.FC<Pick<UserDashboardProps, 'currentUser' | 'equ
                     type="submit" 
                     disabled={ 
                         isSubmitting || 
+                        hasIncompleteProfile ||
                         !selectedInstructor || 
                         !foundEquipment || 
+                        foundEquipment.id === currentUser.id ||
                         foundEquipment.status !== EquipmentStatus.AVAILABLE 
                     } 
-                    className="w-full sm:w-auto px-8 py-3 bg-sena-green text-white font-bold rounded-lg hover:bg-opacity-90 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:transform-none flex items-center justify-center gap-2 shadow-lg"
+                    className="w-full sm:w-auto px-8 py-3 bg-sena-green text-white font-bold rounded-lg hover:bg-opacity-90 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 shadow-lg"
                 >
                     {isSubmitting ? (
                         <><Spinner size="5" color="white" /> Procesando...</>
+                    ) : hasIncompleteProfile ? (
+                        "Completa tus datos para solicitar"
                     ) : (
                         "Registrar y Descargar PDF"
                     )}

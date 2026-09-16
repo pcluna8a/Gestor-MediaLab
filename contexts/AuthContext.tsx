@@ -5,6 +5,14 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, query, where, getDocs, limit, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { loginInstructor, loginStudent, logoutUser, loginWithGoogle as loginWithGoogleService, sendPasswordReset as sendResetService, completeUserProfile } from '../services/firebaseService';
 
+export interface CompleteProfileData {
+    id: string;
+    category: UserCategory;
+    firstName: string;
+    lastName: string;
+    email: string;
+}
+
 interface AuthContextType {
     currentUser: User | null;
     pendingProfileUser: FirebaseUser | null;
@@ -13,7 +21,8 @@ interface AuthContextType {
     loginStudent: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
     loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
     sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
-    completeProfile: (id: string, category: UserCategory) => Promise<{ success: boolean; error?: string }>;
+    completeProfile: (data: CompleteProfileData) => Promise<{ success: boolean; error?: string }>;
+    updateProfileData: (data: { firstName: string; lastName: string; email: string; category?: UserCategory }) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
     isAdmin: boolean;
     isInstructor: boolean;
@@ -138,18 +147,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return processLoginResult(res);
     };
 
-    const handleCompleteProfile = async (id: string, category: UserCategory) => {
+    const handleCompleteProfile = async (data: CompleteProfileData) => {
         if (!pendingProfileUser) return { success: false, error: "No hay cuenta pendiente vinculada." };
 
         const isGoogleProvider = pendingProfileUser.providerData.some(p => p.providerId === 'google.com');
-        const email = isGoogleProvider ? undefined : pendingProfileUser.email || undefined;
+        const email = data.email.trim();
         const emailGoogle = isGoogleProvider ? pendingProfileUser.email || undefined : undefined;
-        const name = pendingProfileUser.displayName || 'Usuario Registrado';
+        const fullName = `${data.firstName.trim()} ${data.lastName.trim()}`.trim();
 
-        const res = await completeUserProfile(id, pendingProfileUser.uid, category, email, emailGoogle, name);
+        const res = await completeUserProfile(data.id, pendingProfileUser.uid, data.category, email, emailGoogle, fullName);
         if (res.success && res.user) {
             setCurrentUser(res.user);
             setPendingProfileUser(null);
+            return { success: true };
+        }
+        return { success: false, error: res.error };
+    };
+
+    const handleUpdateProfileData = async (data: { firstName: string; lastName: string; email: string; category?: UserCategory }) => {
+        if (!currentUser) return { success: false, error: "No hay sesión activa." };
+        const fullName = `${data.firstName.trim()} ${data.lastName.trim()}`.trim();
+        const category = data.category || currentUser.category || UserCategory.APRENDIZ;
+        const res = await completeUserProfile(currentUser.id, currentUser.uid || '', category, data.email.trim(), currentUser.emailGoogle, fullName);
+        if (res.success && res.user) {
+            setCurrentUser(res.user);
             return { success: true };
         }
         return { success: false, error: res.error };
@@ -174,6 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithGoogle: handleLoginGoogle,
         sendPasswordReset: handleResetPassword,
         completeProfile: handleCompleteProfile,
+        updateProfileData: handleUpdateProfileData,
         logout,
         isAdmin: currentUser?.isSuperAdmin === true,
         isInstructor: currentUser?.role === Role.INSTRUCTOR_MEDIALAB

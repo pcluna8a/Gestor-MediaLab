@@ -1,23 +1,25 @@
 import React, { useState } from 'react';
-import { User, Role, UserCategory } from '../../types';
+import { User, Role, UserCategory, Equipment, isValidUserFullName, isValidUserEmail } from '../../types';
 import { UserGroupIcon, UserPlusIcon, SearchIcon, UploadIcon, CameraIcon } from '../Icons';
 import Modal from '../Modal';
 import Pagination from '../Pagination';
 
 interface ManageUsersViewProps {
     users: User[];
+    equipment?: Equipment[];
     currentUser: User;
     onAddNewUser: (newUser: User) => { success: boolean; message: string };
     onUpdateUser: (user: User) => void;
     isOnline: boolean;
 }
 
-const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, onAddNewUser, onUpdateUser, isOnline }) => {
+const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, equipment, currentUser, onAddNewUser, onUpdateUser, isOnline }) => {
     const [newUserId, setNewUserId] = useState('');
     const [newUserName, setNewUserName] = useState('');
     const [newUserRole, setNewUserRole] = useState<Role>(Role.USUARIO_MEDIALAB);
     const [newUserCategory, setNewUserCategory] = useState<UserCategory>(UserCategory.APRENDIZ);
     const [newUserEmail, setNewUserEmail] = useState('');
+    const [formError, setFormError] = useState<string | null>(null);
 
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -32,25 +34,51 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
 
     const handleAddUser = (e: React.FormEvent) => {
         e.preventDefault();
+        const cleanId = newUserId.trim();
+        const cleanName = newUserName.trim();
+        const cleanEmail = newUserEmail.trim();
+
+        if (!cleanId) {
+            setFormError('Por favor ingresa un número de identificación.');
+            return;
+        }
+
+        if (equipment && equipment.some(e => e.id.toLowerCase() === cleanId.toLowerCase())) {
+            setFormError(`El ID "${cleanId}" pertenece a un equipo del inventario. No puede registrarse como usuario.`);
+            return;
+        }
+
+        if (!isValidUserFullName(cleanName)) {
+            setFormError('Debes ingresar nombres y apellidos completos (al menos 2 palabras, mínimo 5 caracteres).');
+            return;
+        }
+
+        if (!isValidUserEmail(cleanEmail)) {
+            setFormError('Debes ingresar un correo electrónico válido (ej. usuario@sena.edu.co).');
+            return;
+        }
+
+        setFormError(null);
         const newUser: User = {
-            id: newUserId,
-            name: newUserName.toUpperCase(),
+            id: cleanId,
+            name: cleanName.toUpperCase(),
             role: newUserRole,
             category: newUserCategory,
-            email: newUserRole === Role.INSTRUCTOR_MEDIALAB ? newUserEmail : undefined,
+            email: cleanEmail,
             isSuperAdmin: newUserCategory === UserCategory.SUPER_ADMIN
         };
 
         const result = onAddNewUser(newUser);
-
-        // Handle result (sync or basic object check) - In App.tsx it returns a helpful object now.
-        // If it's a promise, we can't check .success synchronously.
-        // However, standard flow here assumes optimization in parent or fire-and-forget for now with toast.
+        if (result && !result.success) {
+            setFormError(result.message);
+            return;
+        }
 
         setNewUserId('');
         setNewUserName('');
         setNewUserEmail('');
         setNewUserRole(Role.USUARIO_MEDIALAB);
+        setNewUserCategory(UserCategory.APRENDIZ);
     };
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,10 +103,18 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
 
     const handleUpdateClick = () => {
         if (editingUser && onUpdateUser) {
+            if (!isValidUserFullName(editName)) {
+                alert('Debes ingresar nombres y apellidos completos (al menos 2 palabras).');
+                return;
+            }
+            if (editEmail && !isValidUserEmail(editEmail)) {
+                alert('Debes ingresar un correo electrónico válido.');
+                return;
+            }
             onUpdateUser({
                 ...editingUser,
-                name: editName.toUpperCase(),
-                email: editEmail,
+                name: editName.trim().toUpperCase(),
+                email: editEmail.trim(),
                 role: editRole,
                 category: editCategory,
                 isSuperAdmin: editCategory === UserCategory.SUPER_ADMIN,
@@ -225,10 +261,27 @@ const ManageUsersView: React.FC<ManageUsersViewProps> = ({ users, currentUser, o
                             )}
                         </div>
 
-                        {newUserRole === Role.INSTRUCTOR_MEDIALAB && (
-                            <div>
-                                <label className="block text-xs font-medium text-gray-400 mb-1">Correo Electrónico</label>
-                                <input type="email" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="@sena.edu.co" className="w-full p-3 bg-black/20 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green outline-none transition-all" />
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                                Correo Electrónico <span className="text-red-400">*</span>
+                            </label>
+                            <input
+                                type="email"
+                                value={newUserEmail}
+                                onChange={e => {
+                                    setNewUserEmail(e.target.value);
+                                    if (formError) setFormError(null);
+                                }}
+                                placeholder="ejemplo@sena.edu.co"
+                                className="w-full p-3 bg-black/20 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:border-sena-green outline-none transition-all"
+                                required
+                            />
+                        </div>
+
+                        {formError && (
+                            <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-lg text-xs text-red-200 flex items-start gap-2">
+                                <span className="text-red-400 font-bold">⚠️</span>
+                                <span>{formError}</span>
                             </div>
                         )}
 

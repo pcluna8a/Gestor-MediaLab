@@ -149,7 +149,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return await registerNewLoanInCloud(loan);
     };
 
-    const registerReturn = async (loanId: string, equipmentId: string, data: { concept: string, status: string, photos: string[], analysis: string }) => {
+    const registerReturn = async (loanId: string, equipmentId: string, data: { concept: string, status: string, photos: string[], analysis: string, returnedByInstructorId?: string }) => {
         return await registerReturnInCloud(loanId, equipmentId, data);
     };
 

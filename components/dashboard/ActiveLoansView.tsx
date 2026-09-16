@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { LoanRecord, Equipment, User, UserCategory } from '../../types';
+import { LoanRecord, Equipment, User, UserCategory, isValidUserFullName } from '../../types';
 import { analyzeEquipmentCondition } from '../../services/geminiService';
 import Modal from '../Modal';
 import Spinner from '../Spinner';
-import { CameraIcon } from '../Icons';
+import { CameraIcon, LockClosedIcon } from '../Icons';
 import { CameraCapture } from '../CameraCapture';
 import Pagination from '../Pagination';
 
@@ -11,16 +11,20 @@ interface ActiveLoansViewProps {
     loans: LoanRecord[];
     equipment: Equipment[];
     users: User[];
-    onReturn: (loanId: string, returnConcept: string, returnStatus: string, returnPhoto?: string[], returnAnalysis?: string) => void;
     currentUser?: User;
+    onReturn: (loanId: string, returnConcept: string, returnStatus: string, returnPhoto?: string[], returnAnalysis?: string) => void;
 }
 
-type SortKey = 'equipment' | 'user' | 'date';
+type SortKey = 'equipment' | 'user' | 'instructor' | 'date';
 
-const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, users, onReturn, currentUser }) => {
-    const isAuthorizedInstructor = (loan: LoanRecord) => {
+const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, users, currentUser, onReturn }) => {
+    const isSuperAdmin = currentUser?.isSuperAdmin || (currentUser?.category as string) === 'SUPER-ADMIN';
+
+    // Permite verificar si el usuario logueado es el instructor responsable del préstamo o superadmin
+    const canUserReturnLoan = (loan: LoanRecord): boolean => {
+        // Préstamos históricos sin instructorId asignado quedan habilitados para no bloquear el inventario
+        if (!loan.instructorId) return true;
         if (!currentUser) return false;
-        const isSuperAdmin = currentUser.isSuperAdmin || (currentUser.category as string) === 'SUPER-ADMIN';
         return currentUser.id === loan.instructorId || isSuperAdmin;
     };
     const activeLoans = loans.filter(l => !l.returnDate).sort((a, b) => b.loanDate.getTime() - a.loanDate.getTime());
@@ -31,17 +35,23 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
+
+
     // Search filter
     const filteredLoans = activeLoans.filter(loan => {
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         const eq = equipment.find(e => e.id === loan.equipmentId);
         const usr = users.find(u => u.id === loan.borrowerId);
+        const inst = users.find(u => u.id === loan.instructorId);
         return (
             (eq?.name || '').toLowerCase().includes(term) ||
             (eq?.id || '').toLowerCase().includes(term) ||
             (usr?.name || '').toLowerCase().includes(term) ||
-            (usr?.id || '').toLowerCase().includes(term)
+            (usr?.id || '').toLowerCase().includes(term) ||
+            (inst?.name || '').toLowerCase().includes(term) ||
+            (inst?.id || '').toLowerCase().includes(term) ||
+            (loan.instructorId || '').toLowerCase().includes(term)
         );
     });
 
@@ -58,6 +68,9 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                 } else if (sortConfig.key === 'user') {
                     aVal = users.find(u => u.id === a.borrowerId)?.name || a.borrowerId;
                     bVal = users.find(u => u.id === b.borrowerId)?.name || b.borrowerId;
+                } else if (sortConfig.key === 'instructor') {
+                    aVal = users.find(u => u.id === a.instructorId)?.name || a.instructorId;
+                    bVal = users.find(u => u.id === b.instructorId)?.name || b.instructorId;
                 } else if (sortConfig.key === 'date') {
                     return sortConfig.direction === 'asc'
                         ? a.loanDate.getTime() - b.loanDate.getTime()
@@ -100,7 +113,7 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
     const [aiAnalysis, setAiAnalysis] = useState('');
 
     const openReturnModal = (loan: LoanRecord) => {
-        if (!isAuthorizedInstructor(loan)) return;
+        if (!canUserReturnLoan(loan)) return;
         setSelectedLoan(loan);
         setReturnConcept('');
         setReturnStatus('Bueno');
@@ -121,6 +134,9 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
 
     const submitReturn = () => {
         if (selectedLoan) {
+            if (!canUserReturnLoan(selectedLoan)) {
+                return;
+            }
             onReturn(selectedLoan.id, returnConcept, returnStatus, returnPhotos, aiAnalysis);
             setSelectedLoan(null);
         }
@@ -133,7 +149,7 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                 <div className="relative max-w-xs w-full">
                     <input
                         type="text"
-                        placeholder="Buscar equipo o usuario..."
+                        placeholder="Buscar equipo, usuario o instructor..."
                         value={searchTerm}
                         onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                         className="w-full pl-4 pr-4 py-2.5 bg-black/20 border border-white/10 rounded-lg text-white text-sm placeholder-gray-600 focus:border-sena-green outline-none transition-all"
@@ -144,12 +160,63 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
             {/* Modal de Devolución */}
             <Modal isOpen={!!selectedLoan} onClose={() => setSelectedLoan(null)} title="Registrar Devolución">
                 <div className="space-y-4">
-                    {selectedLoan && (
-                        <div className="bg-white/5 border border-white/10 p-3 rounded-lg text-sm text-gray-300">
-                            <p><span className="font-bold text-white">Equipo:</span> {equipment.find(e => e.id === selectedLoan.equipmentId)?.name}</p>
-                            <p><span className="font-bold text-white">Usuario:</span> {users.find(u => u.id === selectedLoan.borrowerId)?.name}</p>
-                        </div>
-                    )}
+                    {selectedLoan && (() => {
+                        const loanInstructor = users.find(u => u.id === selectedLoan.instructorId);
+                        const isAuthorized = canUserReturnLoan(selectedLoan);
+                        const isMe = currentUser && selectedLoan.instructorId === currentUser.id;
+                        return (
+                            <div className="bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm text-gray-300 space-y-2 shadow-inner">
+                                <p className="flex items-center justify-between">
+                                    <span><span className="font-bold text-white">Equipo:</span> {equipment.find(e => e.id === selectedLoan.equipmentId)?.name || selectedLoan.equipmentId}</span>
+                                    <span className="text-[11px] font-mono text-gray-400">ID: {selectedLoan.equipmentId}</span>
+                                </p>
+                                <p className="flex items-center justify-between">
+                                    <span>
+                                        <span className="font-bold text-white">Usuario:</span>{' '}
+                                        {(() => {
+                                            const borrowerUser = users.find(u => u.id === selectedLoan.borrowerId);
+                                            const isBorrowerEqCollision = selectedLoan.borrowerId === selectedLoan.equipmentId || equipment.some(e => e.id === selectedLoan.borrowerId);
+                                            if (isBorrowerEqCollision) {
+                                                return <span className="text-red-400 font-semibold">🚨 ID de Equipo ({selectedLoan.borrowerId})</span>;
+                                            }
+                                            if (borrowerUser && isValidUserFullName(borrowerUser.name)) {
+                                                return borrowerUser.name;
+                                            }
+                                            return (
+                                                <span className="text-amber-300 font-semibold">
+                                                    ⚠️ {borrowerUser?.name && borrowerUser.name !== 'Usuario' && borrowerUser.name !== 'Usuario Registrado' ? borrowerUser.name : `ID: ${selectedLoan.borrowerId} (Datos Incompletos)`}
+                                                </span>
+                                            );
+                                        })()}
+                                    </span>
+                                    <span className="text-[11px] font-mono text-gray-400">ID: {selectedLoan.borrowerId}</span>
+                                </p>
+                                <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                                    <p>
+                                        <span className="font-bold text-white">Instructor Responsable:</span>{' '}
+                                        <span className="text-gray-200">
+                                            {loanInstructor ? loanInstructor.name : (selectedLoan.instructorId ? `ID: ${selectedLoan.instructorId}` : 'Sin instructor registrado')}
+                                        </span>
+                                    </p>
+                                    {isMe ? (
+                                        <span className="inline-flex self-start sm:self-auto text-[10px] font-semibold bg-sena-green/20 text-sena-green px-2 py-0.5 rounded-full border border-sena-green/30">
+                                            ✓ Autorizado por ti
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex self-start sm:self-auto text-[10px] font-semibold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
+                                            <LockClosedIcon className="w-3 h-3" /> Solo este instructor
+                                        </span>
+                                    )}
+                                </div>
+                                {!isAuthorized && (
+                                    <div className="mt-2 p-2.5 bg-red-500/20 border border-red-500/40 rounded-lg text-xs text-red-200 flex items-center gap-2">
+                                        <LockClosedIcon className="w-4 h-4 flex-shrink-0 text-red-400" />
+                                        <span>Solo el instructor que autorizó el préstamo ({loanInstructor?.name || selectedLoan.instructorId}) puede recibir este equipo y registrar la devolución.</span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Selección de Estado Cualitativo */}
                     <div>
@@ -221,7 +288,12 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
 
                     <button
                         onClick={submitReturn}
-                        className="w-full bg-sena-green text-white font-bold py-3 rounded-xl hover:shadow-[0_0_20px_rgba(57,169,0,0.4)] hover:scale-[1.02] active:scale-95 transition-all"
+                        disabled={selectedLoan ? !canUserReturnLoan(selectedLoan) : false}
+                        className={`w-full font-bold py-3 rounded-xl transition-all ${
+                            selectedLoan && !canUserReturnLoan(selectedLoan)
+                                ? 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-50'
+                                : 'bg-sena-green text-white hover:shadow-[0_0_20px_rgba(57,169,0,0.4)] hover:scale-[1.02] active:scale-95'
+                        }`}
                     >
                         Confirmar Devolución
                     </button>
@@ -249,6 +321,12 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                 Instructor Responsable
                             </th>
                             <th
+                                onClick={() => handleSort('instructor')}
+                                className="px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors select-none"
+                            >
+                                Instructor Responsable{getSortIndicator('instructor')}
+                            </th>
+                            <th
                                 onClick={() => handleSort('date')}
                                 className="px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors select-none"
                             >
@@ -267,9 +345,9 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                 const eq = equipment.find(e => e.id === loan.equipmentId);
                                 const usr = users.find(u => u.id === loan.borrowerId);
                                 const inst = users.find(u => u.id === loan.instructorId);
-                                const canReturn = isAuthorizedInstructor(loan);
-                                const instructorName = inst?.name || loan.instructorId || 'Instructor Medialab';
-
+                                const canReturn = canUserReturnLoan(loan);
+                                const isMe = currentUser && loan.instructorId === currentUser.id;
+                                const instructorName = inst?.name || (loan.instructorId ? `ID: ${loan.instructorId}` : 'Instructor Medialab');
                                 return (
                                     <tr key={loan.id} className="hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white flex items-center gap-3">
@@ -284,16 +362,69 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                             ) : 'Equipo Desconocido'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-bold text-white uppercase">
-                                                {usr ? (usr.name !== 'Usuario' ? usr.name : 'Usuario Registrado') : 'Usuario Desconocido'}
-                                            </div>
-                                            <div className="text-[10px] text-gray-500 font-mono mt-1">ID: {loan.borrowerId}</div>
+                                            {(() => {
+                                                const isBorrowerEqCollision = loan.borrowerId === loan.equipmentId || equipment.some(e => e.id === loan.borrowerId);
+                                                const hasValidBorrowerName = isValidUserFullName(usr?.name);
+
+                                                if (isBorrowerEqCollision) {
+                                                    return (
+                                                        <div>
+                                                            <div className="text-xs font-bold text-red-400 uppercase flex items-center gap-1">
+                                                                🚨 Colisión: ID de Equipo
+                                                            </div>
+                                                            <div className="text-[10px] text-red-300/80 font-mono mt-0.5">ID: {loan.borrowerId}</div>
+                                                            <span className="inline-block mt-1 text-[9px] bg-red-500/20 text-red-300 px-1.5 py-0.5 rounded border border-red-500/30">
+                                                                Préstamo irregular
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                if (hasValidBorrowerName) {
+                                                    return (
+                                                        <div>
+                                                            <div className="text-sm font-bold text-white uppercase">{usr!.name}</div>
+                                                            <div className="text-[10px] text-gray-500 font-mono mt-1">ID: {loan.borrowerId}</div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div>
+                                                        <div className="text-xs font-bold text-amber-300 uppercase">
+                                                            {usr?.name && usr.name !== 'Usuario' && usr.name !== 'Usuario Registrado' ? usr.name : `ID: ${loan.borrowerId}`}
+                                                        </div>
+                                                        <div className="text-[10px] text-gray-500 font-mono mt-0.5">ID: {loan.borrowerId}</div>
+                                                        <span className="inline-block mt-1 text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 font-semibold">
+                                                            ⚠️ Requiere Actualizar Datos
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-semibold text-gray-200">
-                                                {instructorName}
+                                            <div className="flex items-center gap-2.5">
+                                                {inst?.photoURL ? (
+                                                    <img src={inst.photoURL} alt="" className="w-8 h-8 rounded-full object-cover border border-white/20 flex-shrink-0" />
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-full bg-sena-green/20 border border-sena-green/30 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                                        {inst?.name ? inst.name.charAt(0).toUpperCase() : 'I'}
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <div className="text-sm font-bold text-white uppercase flex items-center gap-1.5">
+                                                        <span>{inst ? (inst.name !== 'Usuario' ? inst.name : 'Instructor') : (loan.instructorId ? `ID: ${loan.instructorId}` : 'Sin Asignar')}</span>
+                                                        {isMe && (
+                                                            <span className="text-[9px] bg-sena-green/20 text-sena-green px-1.5 py-0.5 rounded border border-sena-green/30 font-semibold tracking-wider">
+                                                                TÚ
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-500 font-mono mt-0.5">
+                                                        {loan.instructorId ? `ID: ${loan.instructorId}` : 'Sin ID'}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="text-[10px] text-sena-green/80 font-mono mt-0.5">Autorizó Préstamo</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{loan.loanDate.toLocaleDateString()} {loan.loanDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -306,11 +437,17 @@ const ActiveLoansView: React.FC<ActiveLoansViewProps> = ({ loans, equipment, use
                                                     Registrar Devolución
                                                 </button>
                                             ) : (
-                                                <div
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold select-none"
-                                                    title={`Devolución restringida: Solo ${instructorName} puede recibir este equipo.`}
-                                                >
-                                                    <span>🔒 Solo {instructorName.split(' ')[0]}</span>
+                                                <div className="flex flex-col items-start gap-1">
+                                                    <div
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold select-none cursor-not-allowed"
+                                                        title={`Devolución restringida: Solo el instructor que autorizó el préstamo (${instructorName}) puede recibir este equipo.`}
+                                                    >
+                                                        <LockClosedIcon className="w-3.5 h-3.5 text-amber-400" />
+                                                        <span>Bloqueado</span>
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-500 font-mono">
+                                                        Solo: {inst ? inst.name.split(' ')[0] : (loan.instructorId || 'Instructor')}
+                                                    </span>
                                                 </div>
                                             )}
                                         </td>

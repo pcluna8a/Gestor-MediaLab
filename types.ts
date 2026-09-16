@@ -73,6 +73,7 @@ export interface LoanRecord {
   returnConditionAnalysis?: string;
   returnConcept?: string;
   returnStatus?: string; // Excelente, Bueno, Aceptable, Regular, Malo
+  returnedByInstructorId?: string; // ID del instructor que recibe la devolución
 }
 
 export interface MaintenanceSuggestion {
@@ -95,3 +96,39 @@ export const createNewLoan = (data: Partial<LoanRecord>): LoanRecord => {
     returnStatus: '',
   };
 };
+
+/**
+ * Valida que un nombre de usuario no sea genérico y contenga al menos Nombre y Apellido
+ */
+export const isValidUserFullName = (name?: string): boolean => {
+  if (!name) return false;
+  const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === 'usuario registrado' || lower === 'usuario' || lower === 'usuario desconocido' || lower === 'sin asignar') {
+    return false;
+  }
+  const parts = trimmed.split(/\s+/).filter(part => part.length >= 2);
+  return parts.length >= 2;
+};
+
+/**
+ * Valida formato básico de correo electrónico
+ */
+export const isValidUserEmail = (email?: string): boolean => {
+  if (!email) return false;
+  const trimmed = email.trim();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(trimmed);
+};
+
+/**
+ * Determina si el perfil de un usuario está incompleto (le falta nombre/apellido real o correo)
+ */
+export const isProfileIncomplete = (user: User | null | undefined): boolean => {
+  if (!user) return false;
+  if (!isValidUserFullName(user.name)) return true;
+  const email = user.email || user.emailGoogle;
+  if (!isValidUserEmail(email)) return true;
+  return false;
+};
+

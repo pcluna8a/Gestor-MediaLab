@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Role, User, LoanRecord, Equipment } from './types';
+import { Role, User, LoanRecord, Equipment, isValidUserFullName, isValidUserEmail, isProfileIncomplete } from './types';
 import InstructorDashboard from './components/InstructorDashboard';
 import UserDashboard from './components/AprendizDashboard';
 import { LogoutIcon, SunIcon, MoonIcon } from './components/Icons';
@@ -11,6 +11,7 @@ import { CompleteProfileModal } from './components/CompleteProfileModal';
 import GlassCard from './components/GlassCard';
 import ErrorBoundary from './components/ErrorBoundary';
 import LandingView from './components/LandingView';
+import { cleanupEquipmentUserCollisions } from './services/firebaseService';
 
 const getGreetingName = (fullName: string): string => {
   if (!fullName) return 'Usuario';
@@ -51,12 +52,11 @@ const MainApp: React.FC = () => {
 
   const { toast, showToast, closeToast } = useToast();
 
-  // Force dark mode class for Tailwind
+  // Force dark mode class for Tailwind and cleanup collisions
   useEffect(() => {
     document.documentElement.classList.add('dark');
+    cleanupEquipmentUserCollisions();
   }, []);
-
-
 
   const handleNewLoan = async (loan: LoanRecord) => {
     const result = await registerLoan(loan);
@@ -67,15 +67,39 @@ const MainApp: React.FC = () => {
   const handleReturn = async (loanId: string, concept: string, status: string, photos: string[], analysis: string) => {
     const loan = loans.find(l => l.id === loanId);
     if (!loan) return;
-    const result = await registerReturn(loanId, loan.equipmentId, { concept, status, photos, analysis });
+    if (loan.instructorId && currentUser && loan.instructorId !== currentUser.id) {
+      showToast("Solo el instructor que autorizó el préstamo puede recibir y registrar la devolución", "error");
+      return;
+    }
+    const result = await registerReturn(loanId, loan.equipmentId, {
+      concept,
+      status,
+      photos,
+      analysis,
+      returnedByInstructorId: currentUser?.id
+    });
     if (result.success) showToast("Devolución registrada exitosamente", "success");
     else showToast(result.error || "Error al registrar devolución", "error");
   };
 
   const handleAddNewUser = async (newUser: User) => {
-    const exists = users.some(u => u.id === newUser.id);
-    if (exists) return { success: false, message: 'El usuario ya existe.' };
-    await addUser(newUser);
+    const cleanId = newUser.id.trim().replace(/[^0-9]/g, '');
+    if (!cleanId || cleanId.length < 5) {
+      return { success: false, message: 'El documento debe contener al menos 5 dígitos numéricos.' };
+    }
+    const isEq = equipment.some(e => e.id === cleanId);
+    if (isEq) {
+      return { success: false, message: `El documento ${cleanId} corresponde a un equipo del inventario.` };
+    }
+    if (!isValidUserFullName(newUser.name)) {
+      return { success: false, message: 'El usuario debe tener Nombre y Apellido completos (mínimo dos palabras).' };
+    }
+    if (newUser.email && !isValidUserEmail(newUser.email)) {
+      return { success: false, message: 'El correo electrónico ingresado no es válido.' };
+    }
+    const exists = users.some(u => u.id === cleanId);
+    if (exists) return { success: false, message: 'El usuario ya existe con este ID.' };
+    await addUser({ ...newUser, id: cleanId });
     showToast("Usuario agregado correctamente", "success");
     return { success: true, message: 'Usuario agregado.' };
   };
@@ -121,6 +145,16 @@ const MainApp: React.FC = () => {
       <>
         {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
         {pendingProfileUser ? <CompleteProfileModal /> : <LoginScreen />}
+      </>
+    );
+  }
+
+  // Si el usuario autenticado tiene datos incompletos o 'Usuario Registrado', forzar que diligencie su registro completo
+  if (isProfileIncomplete(currentUser)) {
+    return (
+      <>
+        {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
+        <CompleteProfileModal />
       </>
     );
   }
